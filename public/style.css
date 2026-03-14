@@ -79,6 +79,10 @@ main {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  min-height: 2.2em;
+  display: flex;
+  align-items: center;
+  text-align: center;
 }
 
 .sim-panel canvas {
