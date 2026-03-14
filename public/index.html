@@ -27,6 +27,10 @@
           <div class="sim-label" style="color:#b794f4">Halton Sequence</div>
           <canvas id="canvas-halton"></canvas>
         </div>
+        <div class="sim-panel" id="panel-pointfilter" hidden>
+          <div class="sim-label" style="color:#f6ad55">Point-filter</div>
+          <canvas id="canvas-pointfilter"></canvas>
+        </div>
       </div>
     </section>
 
@@ -58,6 +62,14 @@
             </label>
           </div>
           <div class="method-info">Low-discrepancy quasi-random sequence (bases 2, 3, 5) fills the canvas more evenly than pseudorandom numbers, accelerating convergence.</div>
+
+          <div class="method-toggle-row">
+            <label class="method-toggle">
+              <input type="checkbox" id="toggle-pointfilter">
+              <span style="color:#f6ad55">Point-filter (rejection)</span>
+            </label>
+          </div>
+          <div class="method-info">Picks a random starting point, then generates candidate second points via rejection sampling inside a disk of radius L. No angle is ever computed — direction is implicit in the two endpoints.</div>
         </div>
 
         <label>
@@ -94,6 +106,7 @@
               <th data-method="uniform" style="color:#63b3ed">Uniform</th>
               <th data-method="stratified" style="color:#48bb78">Stratified</th>
               <th data-method="halton" style="color:#b794f4">Halton</th>
+              <th data-method="pointfilter" style="color:#f6ad55">Point-filter</th>
             </tr>
           </thead>
           <tbody>
@@ -102,18 +115,21 @@
               <td data-method="uniform" id="stat-drops-uniform">0</td>
               <td data-method="stratified" id="stat-drops-stratified">0</td>
               <td data-method="halton" id="stat-drops-halton">0</td>
+              <td data-method="pointfilter" id="stat-drops-pointfilter">0</td>
             </tr>
             <tr>
               <td class="stat-label">π est.</td>
               <td data-method="uniform" id="stat-pi-uniform" class="stat-pi">—</td>
               <td data-method="stratified" id="stat-pi-stratified" class="stat-pi">—</td>
               <td data-method="halton" id="stat-pi-halton" class="stat-pi">—</td>
+              <td data-method="pointfilter" id="stat-pi-pointfilter" class="stat-pi">—</td>
             </tr>
             <tr>
               <td class="stat-label">Error</td>
               <td data-method="uniform" id="stat-error-uniform" class="stat-error">—</td>
               <td data-method="stratified" id="stat-error-stratified" class="stat-error">—</td>
               <td data-method="halton" id="stat-error-halton" class="stat-error">—</td>
+              <td data-method="pointfilter" id="stat-error-pointfilter" class="stat-error">—</td>
             </tr>
           </tbody>
         </table>

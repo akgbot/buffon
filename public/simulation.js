@@ -1,9 +1,9 @@
 'use strict';
 
 // ── Method configuration ───────────────────────────────────────────────────────
-const METHOD_KEYS   = ['uniform', 'stratified', 'halton'];
-const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b794f4' };
-const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton' };
+const METHOD_KEYS   = ['uniform', 'stratified', 'halton', 'pointfilter'];
+const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b794f4', pointfilter: '#f6ad55' };
+const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton', pointfilter: 'Point-filter' };
 
 // ── Canvas setup ──────────────────────────────────────────────────────────────
 const chartCanvas = document.getElementById('chartCanvas');
@@ -124,36 +124,75 @@ function dropNeedle(method) {
   const canvas = canvases[method];
   const L      = needleRatio * LINE_SPACING;
   const { width, height } = canvas;
-  let cx, cy, theta;
+  let x1, y1, x2, y2, crosses, theta, trackX, trackY;
 
-  if (method === 'stratified') {
-    const strip = Math.floor(Math.random() * numStrips);
-    state.stripCounts[strip] = (state.stripCounts[strip] || 0) + 1;
-    cy    = (strip + Math.random()) * LINE_SPACING;
-    cx    = Math.random() * width;
-    theta = Math.random() * Math.PI;
-  } else if (method === 'halton') {
-    cx    = halton(state.haltonIndex, 2) * width;
-    cy    = halton(state.haltonIndex, 3) * height;
-    theta = halton(state.haltonIndex, 5) * Math.PI;
-    state.haltonIndex++;
+  if (method === 'pointfilter') {
+    // Pick a random starting point
+    x1 = Math.random() * width;
+    y1 = Math.random() * height;
+
+    // Rejection-sample a vector inside the disk of radius L from a bounding square
+    let dx, dy;
+    do {
+      dx = (Math.random() * 2 - 1) * L;
+      dy = (Math.random() * 2 - 1) * L;
+    } while (dx * dx + dy * dy > L * L);
+
+    // Normalize to exact length L (the "filter" step)
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-12) { dx = L; dy = 0; }
+    else { dx = (dx / len) * L; dy = (dy / len) * L; }
+
+    x2 = x1 + dx;
+    y2 = y1 + dy;
+
+    // Crossing detection via endpoints — no angle needed
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    const firstLine = Math.ceil(minY / LINE_SPACING) * LINE_SPACING;
+    crosses = firstLine <= maxY;
+
+    // Derive implicit angle for angle-bin tracking: fold atan2 to [0, π)
+    theta = Math.atan2(dy, dx);
+    if (theta < 0) theta += Math.PI;
+
+    trackX = x1;
+    trackY = y1;
   } else {
-    cx    = Math.random() * width;
-    cy    = Math.random() * height;
-    theta = Math.random() * Math.PI;
+    let cx, cy;
+    if (method === 'stratified') {
+      const strip = Math.floor(Math.random() * numStrips);
+      state.stripCounts[strip] = (state.stripCounts[strip] || 0) + 1;
+      cy    = (strip + Math.random()) * LINE_SPACING;
+      cx    = Math.random() * width;
+      theta = Math.random() * Math.PI;
+    } else if (method === 'halton') {
+      cx    = halton(state.haltonIndex, 2) * width;
+      cy    = halton(state.haltonIndex, 3) * height;
+      theta = halton(state.haltonIndex, 5) * Math.PI;
+      state.haltonIndex++;
+    } else {
+      cx    = Math.random() * width;
+      cy    = Math.random() * height;
+      theta = Math.random() * Math.PI;
+    }
+
+    const dx = (L / 2) * Math.cos(theta);
+    const dy = (L / 2) * Math.sin(theta);
+
+    x1 = cx - dx; y1 = cy - dy;
+    x2 = cx + dx; y2 = cy + dy;
+
+    const distToLine = cy % LINE_SPACING;
+    const minDist    = Math.min(distToLine, LINE_SPACING - distToLine);
+    crosses          = (L / 2) * Math.abs(Math.sin(theta)) >= minDist;
+
+    trackX = cx;
+    trackY = cy;
   }
 
-  const dx = (L / 2) * Math.cos(theta);
-  const dy = (L / 2) * Math.sin(theta);
-  const x1 = cx - dx, y1 = cy - dy;
-  const x2 = cx + dx, y2 = cy + dy;
-
-  const distToLine = cy % LINE_SPACING;
-  const minDist    = Math.min(distToLine, LINE_SPACING - distToLine);
-  const crosses    = (L / 2) * Math.abs(Math.sin(theta)) >= minDist;
-
-  const gx = Math.min(Math.floor(cx / width  * GRID_N), GRID_N - 1);
-  const gy = Math.min(Math.floor(cy / height * GRID_N), GRID_N - 1);
+  const gx = Math.min(Math.floor(trackX / width  * GRID_N), GRID_N - 1);
+  const gy = Math.min(Math.floor(trackY / height * GRID_N), GRID_N - 1);
   state.gridCounts[gy * GRID_N + gx]++;
 
   const ai = Math.min(Math.floor(theta / Math.PI * ANGLE_BINS), ANGLE_BINS - 1);
