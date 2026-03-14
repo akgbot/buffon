@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buffon's Needle Simulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Buffon's Needle Simulator</h1>
+    <p class="subtitle">Estimating π by dropping needles on a lined floor</p>
+  </header>
+
+  <main>
+    <section class="canvas-section">
+      <canvas id="simCanvas"></canvas>
+    </section>
+
+    <aside class="panel">
+      <section class="controls">
+        <h2>Controls</h2>
+
+        <label>
+          Needle length
+          <span class="value-badge" id="needleLenLabel">0.8× spacing</span>
+          <input type="range" id="needleLen" min="0.2" max="1.0" step="0.05" value="0.8">
+        </label>
+
+        <label>
+          Drop speed
+          <span class="value-badge" id="speedLabel">Medium</span>
+          <input type="range" id="speed" min="1" max="5" step="1" value="3">
+        </label>
+
+        <div class="buttons">
+          <button id="btnStart" class="btn primary">Start</button>
+          <button id="btnPause" class="btn" disabled>Pause</button>
+          <button id="btnReset" class="btn">Reset</button>
+        </div>
+      </section>
+
+      <section class="stats">
+        <h2>Statistics</h2>
+        <dl>
+          <dt>Total Drops</dt>
+          <dd id="statDrops">0</dd>
+
+          <dt>Crossings</dt>
+          <dd id="statCrossings">0</dd>
+
+          <dt>Estimated π</dt>
+          <dd id="statPi">—</dd>
+
+          <dt>Error</dt>
+          <dd id="statError">—</dd>
+        </dl>
+      </section>
+
+      <section class="chart-section">
+        <h2>π Convergence</h2>
+        <canvas id="chartCanvas"></canvas>
+      </section>
+
+      <section class="formula">
+        <h2>How it works</h2>
+        <p>
+          A needle of length <em>L</em> dropped on a floor with lines spaced <em>D</em> apart
+          crosses a line with probability:
+        </p>
+        <p class="math">P = 2L / (π · D)</p>
+        <p>Rearranging to estimate π:</p>
+        <p class="math">π ≈ 2L · N / (D · C)</p>
+        <p class="small">where N = total drops, C = crossings</p>
+      </section>
+    </aside>
+  </main>
+
+  <script src="simulation.js"></script>
+</body>
+</html>

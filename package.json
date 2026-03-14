@@ -1,0 +1,12 @@
+{
+  "name": "buffons-needle-simulator",
+  "version": "1.0.0",
+  "description": "Buffon's Needle simulation with visual rendering",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
