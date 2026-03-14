@@ -19,11 +19,11 @@
           <div class="sim-label" style="color:#63b3ed">Uniform Random</div>
           <canvas id="canvas-uniform"></canvas>
         </div>
-        <div class="sim-panel" id="panel-stratified">
+        <div class="sim-panel" id="panel-stratified" hidden>
           <div class="sim-label" style="color:#48bb78">Stratified</div>
           <canvas id="canvas-stratified"></canvas>
         </div>
-        <div class="sim-panel" id="panel-halton">
+        <div class="sim-panel" id="panel-halton" hidden>
           <div class="sim-label" style="color:#b794f4">Halton Sequence</div>
           <canvas id="canvas-halton"></canvas>
         </div>
@@ -45,7 +45,7 @@
 
           <div class="method-toggle-row">
             <label class="method-toggle">
-              <input type="checkbox" id="toggle-stratified" checked>
+              <input type="checkbox" id="toggle-stratified">
               <span style="color:#48bb78">Stratified</span>
             </label>
           </div>
@@ -53,7 +53,7 @@
 
           <div class="method-toggle-row">
             <label class="method-toggle">
-              <input type="checkbox" id="toggle-halton" checked>
+              <input type="checkbox" id="toggle-halton">
               <span style="color:#b794f4">Halton Sequence</span>
             </label>
           </div>
