@@ -446,6 +446,7 @@ for (const key of METHOD_KEYS) {
       panel.hidden = true;
     }
     updateStatsVisibility();
+    updateRandMetrics();
     resizeCanvases();
   });
 }
