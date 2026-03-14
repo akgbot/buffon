@@ -234,15 +234,26 @@ function autocorrColor(r) {
 
 const elRandMetrics = document.getElementById('randMetrics');
 
+function updateStatsVisibility() {
+  for (const key of METHOD_KEYS) {
+    const show = enabledMethods.has(key);
+    for (const el of document.querySelectorAll(`[data-method="${key}"]`)) {
+      el.hidden = !show;
+    }
+  }
+}
+
 function updateRandMetrics() {
   let html = '<table class="rand-table"><thead><tr><th></th>';
   for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
     html += `<th style="color:${METHOD_COLORS[key]}">${METHOD_LABELS[key]}</th>`;
   }
   html += '</tr></thead><tbody>';
 
   html += '<tr><td class="rand-label">Spatial χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
   for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
     const r = chiSqRatio(methodStates[key].gridCounts);
     html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
   }
@@ -250,6 +261,7 @@ function updateRandMetrics() {
 
   html += '<tr><td class="rand-label">Angle χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
   for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
     const r = chiSqRatio(methodStates[key].angleCounts);
     html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
   }
@@ -257,6 +269,7 @@ function updateRandMetrics() {
 
   html += '<tr><td class="rand-label">Serial autocorr<span class="mnote">ideal ≈ 0</span></td>';
   for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
     const r = lag1Autocorr(methodStates[key].crossingSeq);
     const s = r !== null ? (r >= 0 ? '+' : '') + r.toFixed(4) : '—';
     html += `<td class="mval ${autocorrColor(r)}">${s}</td>`;
@@ -432,6 +445,7 @@ for (const key of METHOD_KEYS) {
       enabledMethods.delete(key);
       panel.hidden = true;
     }
+    updateStatsVisibility();
     resizeCanvases();
   });
 }
@@ -448,4 +462,5 @@ labelSpd.textContent = SPEED_MAP[initSpeed].label;
 numStrips = parseInt(sliderStrips.value);
 labelStrips.textContent = numStrips;
 
+updateStatsVisibility();
 updateStats();
