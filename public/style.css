@@ -83,6 +83,13 @@ main {
   display: flex;
   align-items: center;
   text-align: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sim-panel-disabled {
+  opacity: 0.35;
 }
 
 .sim-panel canvas {

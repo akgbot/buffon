@@ -15,16 +15,22 @@
   <main>
     <section class="canvas-section">
       <div class="sim-panels">
-        <div class="sim-panel">
-          <div class="sim-label" style="color:#63b3ed">Uniform Random</div>
+        <div class="sim-panel" id="panel-uniform">
+          <label class="sim-label" style="color:#63b3ed">
+            <input type="checkbox" id="toggle-uniform" checked> Uniform Random
+          </label>
           <canvas id="canvas-uniform"></canvas>
         </div>
-        <div class="sim-panel">
-          <div class="sim-label" style="color:#48bb78">Stratified</div>
+        <div class="sim-panel" id="panel-stratified">
+          <label class="sim-label" style="color:#48bb78">
+            <input type="checkbox" id="toggle-stratified" checked> Stratified
+          </label>
           <canvas id="canvas-stratified"></canvas>
         </div>
-        <div class="sim-panel">
-          <div class="sim-label" style="color:#b794f4">Halton Sequence</div>
+        <div class="sim-panel" id="panel-halton">
+          <label class="sim-label" style="color:#b794f4">
+            <input type="checkbox" id="toggle-halton" checked> Halton Sequence
+          </label>
           <canvas id="canvas-halton"></canvas>
         </div>
       </div>

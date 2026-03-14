@@ -48,6 +48,7 @@ let running       = false;
 let animId        = null;
 let needleRatio   = 0.8;
 let dropsPerFrame = 5;
+const enabledMethods = new Set(METHOD_KEYS);
 
 function halton(index, base) {
   let result = 0, f = 1;
@@ -325,6 +326,7 @@ function step() {
   if (!running) return;
 
   for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
     for (let i = 0; i < dropsPerFrame; i++) dropNeedle(key);
     const state = methodStates[key];
     if (state.drops - state.lastSample >= 200) {
@@ -418,6 +420,18 @@ document.getElementById('btnRandInfo').addEventListener('click', () => {
   const panel = document.getElementById('randInfoPanel');
   panel.hidden = !panel.hidden;
 });
+
+for (const key of METHOD_KEYS) {
+  document.getElementById('toggle-' + key).addEventListener('change', function () {
+    if (this.checked) {
+      enabledMethods.add(key);
+      document.getElementById('panel-' + key).classList.remove('sim-panel-disabled');
+    } else {
+      enabledMethods.delete(key);
+      document.getElementById('panel-' + key).classList.add('sim-panel-disabled');
+    }
+  });
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('resize', resizeCanvases);
