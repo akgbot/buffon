@@ -39,6 +39,15 @@
           <input type="range" id="speed" min="1" max="5" step="1" value="3">
         </label>
 
+        <label>
+          Generation method
+          <select id="genMethod" class="method-select">
+            <option value="uniform">Uniform random</option>
+            <option value="stratified">Stratified</option>
+            <option value="halton">Halton sequence</option>
+          </select>
+        </label>
+
         <div class="buttons">
           <button id="btnStart" class="btn primary">Start</button>
           <button id="btnPause" class="btn" disabled>Pause</button>
@@ -61,6 +70,34 @@
           <dt>Error</dt>
           <dd id="statError">—</dd>
         </dl>
+      </section>
+
+      <section class="rand-metrics">
+        <h2>Randomness metrics <button id="btnRandInfo" class="btn btn-info" title="How coloring works">ⓘ</button></h2>
+        <div id="randInfoPanel" class="info-panel" hidden>
+          <p>Each metric is color-coded by how closely it matches the expected value for a truly random sequence.</p>
+          <table class="info-table">
+            <thead><tr><th>Color</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mval mval-green">■</span> Green</td><td>Looks random</td></tr>
+              <tr><td><span class="mval mval-teal">■</span> Teal</td><td>Slightly uniform</td></tr>
+              <tr><td><span class="mval mval-blue">■</span> Blue</td><td>Suspiciously uniform — characteristic of quasi-random sequences like Halton</td></tr>
+              <tr><td><span class="mval mval-yellow">■</span> Yellow</td><td>Mild clustering or correlation</td></tr>
+              <tr><td><span class="mval mval-red">■</span> Red</td><td>Strong non-random structure</td></tr>
+            </tbody>
+          </table>
+          <p class="info-subhead">Spatial &amp; Angle χ²/df</p>
+          <p>Chi-squared divided by degrees of freedom. For random data the mean is <strong>1.0</strong> and std dev is √(2/df) — roughly ±0.18 for the 8×8 grid (df=63). Thresholds: blue &lt;0.3, teal 0.3–0.5, green 0.5–1.5, yellow 1.5–2.5, red &gt;2.5.</p>
+          <p class="info-subhead">Serial autocorrelation</p>
+          <p>Lag-1 Pearson correlation of the last 500 crossing results. The significance threshold for zero correlation is roughly 1/√500 ≈ 0.045. Thresholds: green |r|&lt;0.05, yellow 0.05–0.12, red &gt;0.12.</p>
+        </div>
+        <div id="randMetrics"></div>
+      </section>
+
+      <section class="gen-info">
+        <h2>Generation info</h2>
+        <p id="genMethodDesc" class="gen-desc"></p>
+        <div id="genMethodStats" class="gen-stats"></div>
       </section>
 
       <section class="chart-section">
