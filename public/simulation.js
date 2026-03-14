@@ -423,13 +423,6 @@ document.getElementById('btnRandInfo').addEventListener('click', () => {
 });
 
 for (const key of METHOD_KEYS) {
-  document.getElementById('info-btn-' + key).addEventListener('click', () => {
-    const info = document.getElementById('info-' + key);
-    info.hidden = !info.hidden;
-  });
-}
-
-for (const key of METHOD_KEYS) {
   document.getElementById('toggle-' + key).addEventListener('change', function () {
     const panel = document.getElementById('panel-' + key);
     if (this.checked) {
