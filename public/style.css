@@ -83,13 +83,32 @@ main {
   display: flex;
   align-items: center;
   text-align: center;
-  gap: 6px;
-  cursor: pointer;
-  user-select: none;
 }
 
-.sim-panel-disabled {
-  opacity: 0.35;
+/* Method toggle checkboxes */
+.method-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.method-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 0;
+}
+
+.method-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .sim-panel canvas {

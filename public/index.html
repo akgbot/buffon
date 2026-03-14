@@ -16,21 +16,15 @@
     <section class="canvas-section">
       <div class="sim-panels">
         <div class="sim-panel" id="panel-uniform">
-          <label class="sim-label" style="color:#63b3ed">
-            <input type="checkbox" id="toggle-uniform" checked> Uniform Random
-          </label>
+          <div class="sim-label" style="color:#63b3ed">Uniform Random</div>
           <canvas id="canvas-uniform"></canvas>
         </div>
         <div class="sim-panel" id="panel-stratified">
-          <label class="sim-label" style="color:#48bb78">
-            <input type="checkbox" id="toggle-stratified" checked> Stratified
-          </label>
+          <div class="sim-label" style="color:#48bb78">Stratified</div>
           <canvas id="canvas-stratified"></canvas>
         </div>
         <div class="sim-panel" id="panel-halton">
-          <label class="sim-label" style="color:#b794f4">
-            <input type="checkbox" id="toggle-halton" checked> Halton Sequence
-          </label>
+          <div class="sim-label" style="color:#b794f4">Halton Sequence</div>
           <canvas id="canvas-halton"></canvas>
         </div>
       </div>
@@ -39,6 +33,21 @@
     <aside class="panel">
       <section class="controls">
         <h2>Controls</h2>
+
+        <div class="method-toggles">
+          <label class="method-toggle">
+            <input type="checkbox" id="toggle-uniform" checked>
+            <span style="color:#63b3ed">Uniform Random</span>
+          </label>
+          <label class="method-toggle">
+            <input type="checkbox" id="toggle-stratified" checked>
+            <span style="color:#48bb78">Stratified</span>
+          </label>
+          <label class="method-toggle">
+            <input type="checkbox" id="toggle-halton" checked>
+            <span style="color:#b794f4">Halton Sequence</span>
+          </label>
+        </div>
 
         <label>
           Needle length

@@ -66,10 +66,11 @@ const SPEED_MAP = {
 
 // ── Resize canvases ───────────────────────────────────────────────────────────
 function resizeCanvases() {
-  const section = document.querySelector('.canvas-section');
-  const availW  = Math.floor(section.clientWidth / 3) - 24;
-  const availH  = section.clientHeight - 56;
-  const size    = Math.max(10, Math.min(availW, availH));
+  const section  = document.querySelector('.canvas-section');
+  const count    = Math.max(1, enabledMethods.size);
+  const availW   = Math.floor(section.clientWidth / count) - 24;
+  const availH   = section.clientHeight - 56;
+  const size     = Math.max(10, Math.min(availW, availH));
 
   for (const key of METHOD_KEYS) {
     canvases[key].width  = size;
@@ -423,13 +424,15 @@ document.getElementById('btnRandInfo').addEventListener('click', () => {
 
 for (const key of METHOD_KEYS) {
   document.getElementById('toggle-' + key).addEventListener('change', function () {
+    const panel = document.getElementById('panel-' + key);
     if (this.checked) {
       enabledMethods.add(key);
-      document.getElementById('panel-' + key).classList.remove('sim-panel-disabled');
+      panel.hidden = false;
     } else {
       enabledMethods.delete(key);
-      document.getElementById('panel-' + key).classList.add('sim-panel-disabled');
+      panel.hidden = true;
     }
+    resizeCanvases();
   });
 }
 
