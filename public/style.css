@@ -74,6 +74,8 @@ main {
   flex: 1;
 }
 
+.sim-panel[hidden] { display: none; }
+
 .sim-label {
   font-size: 0.75rem;
   font-weight: 700;
