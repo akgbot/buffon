@@ -133,6 +133,10 @@ function updateStats() {
   }
 }
 
+// ── Chart zoom ────────────────────────────────────────────────────────────────
+const ZOOM_LEVELS = [1.5, 0.5, 0.1, 0.02];
+let zoomIndex = 0;
+
 // ── Convergence chart ─────────────────────────────────────────────────────────
 function sampleChart() {
   const est = estimatePi();
@@ -148,9 +152,10 @@ function drawChart() {
 
   if (piHistory.length < 2) return;
 
-  // y range: π ± 1.5
-  const yMin = Math.PI - 1.5;
-  const yMax = Math.PI + 1.5;
+  // y range: π ± zoom
+  const zoom = ZOOM_LEVELS[zoomIndex];
+  const yMin = Math.PI - zoom;
+  const yMax = Math.PI + zoom;
   const toY  = v => height - ((v - yMin) / (yMax - yMin)) * height;
 
   // π reference line
@@ -209,6 +214,13 @@ const sliderStrips = document.getElementById('strips');
 const labelLen    = document.getElementById('needleLenLabel');
 const labelSpd    = document.getElementById('speedLabel');
 const labelStrips = document.getElementById('stripsLabel');
+
+const btnZoom = document.getElementById('btnZoom');
+btnZoom.addEventListener('click', () => {
+  zoomIndex = (zoomIndex + 1) % ZOOM_LEVELS.length;
+  btnZoom.textContent = '±' + ZOOM_LEVELS[zoomIndex];
+  drawChart();
+});
 
 sliderLen.addEventListener('input', () => {
   needleRatio = parseFloat(sliderLen.value);
