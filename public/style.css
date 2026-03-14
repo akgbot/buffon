@@ -237,6 +237,67 @@ dd {
   font-size: 0.75rem;
 }
 
+/* Generation method select */
+.method-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  width: 100%;
+  cursor: pointer;
+  outline: none;
+}
+
+.method-select:focus {
+  border-color: var(--accent);
+}
+
+/* Generation info panel */
+.gen-desc {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.gen-stats {
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.gen-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+  color: var(--muted);
+}
+
+.gen-stat-val {
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.strip-bars {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 32px;
+  margin-top: 8px;
+}
+
+.strip-bar {
+  flex: 1;
+  background: var(--accent);
+  opacity: 0.7;
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.2s;
+}
+
 /* Scrollbar */
 .panel::-webkit-scrollbar { width: 4px; }
 .panel::-webkit-scrollbar-track { background: transparent; }

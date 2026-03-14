@@ -39,6 +39,15 @@
           <input type="range" id="speed" min="1" max="5" step="1" value="3">
         </label>
 
+        <label>
+          Generation method
+          <select id="genMethod" class="method-select">
+            <option value="uniform">Uniform random</option>
+            <option value="stratified">Stratified</option>
+            <option value="halton">Halton sequence</option>
+          </select>
+        </label>
+
         <div class="buttons">
           <button id="btnStart" class="btn primary">Start</button>
           <button id="btnPause" class="btn" disabled>Pause</button>
@@ -61,6 +70,12 @@
           <dt>Error</dt>
           <dd id="statError">—</dd>
         </dl>
+      </section>
+
+      <section class="gen-info">
+        <h2>Generation info</h2>
+        <p id="genMethodDesc" class="gen-desc"></p>
+        <div id="genMethodStats" class="gen-stats"></div>
       </section>
 
       <section class="chart-section">

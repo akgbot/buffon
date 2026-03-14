@@ -24,6 +24,17 @@ let lastSample = 0;
 let needleRatio = 0.8;      // L = needleRatio * LINE_SPACING
 let dropsPerFrame = 5;      // controlled by speed slider
 
+// ── Generation method ─────────────────────────────────────────────────────────
+let generationMethod = 'uniform';
+let haltonIndex = 0;
+let stripCounts = [];
+
+function halton(index, base) {
+  let result = 0, f = 1;
+  while (index > 0) { f /= base; result += f * (index % base); index = Math.floor(index / base); }
+  return result;
+}
+
 // ── Speed map ─────────────────────────────────────────────────────────────────
 const SPEED_MAP = {
   1: { dpf: 1,    label: 'Slow'    },
@@ -82,9 +93,24 @@ function drawNeedle({ x1, y1, x2, y2, crosses }) {
 function dropNeedle() {
   const L     = needleRatio * LINE_SPACING;
   const { width, height } = simCanvas;
-  const cx    = Math.random() * width;
-  const cy    = Math.random() * height;
-  const theta = Math.random() * Math.PI;
+  let cx, cy, theta;
+
+  if (generationMethod === 'stratified') {
+    const strip = Math.floor(Math.random() * numStrips);
+    stripCounts[strip] = (stripCounts[strip] || 0) + 1;
+    cy    = (strip + Math.random()) * LINE_SPACING;
+    cx    = Math.random() * width;
+    theta = Math.random() * Math.PI;
+  } else if (generationMethod === 'halton') {
+    cx    = halton(haltonIndex, 2) * width;
+    cy    = halton(haltonIndex, 3) * height;
+    theta = halton(haltonIndex, 5) * Math.PI;
+    haltonIndex++;
+  } else {
+    cx    = Math.random() * width;
+    cy    = Math.random() * height;
+    theta = Math.random() * Math.PI;
+  }
 
   const dx = (L / 2) * Math.cos(theta);
   const dy = (L / 2) * Math.sin(theta);
@@ -130,6 +156,58 @@ function updateStats() {
     elPi.textContent    = est.toFixed(6);
     const err = Math.abs(est - Math.PI) / Math.PI * 100;
     elError.textContent = err.toFixed(3) + '%';
+  }
+
+  updateMethodInfo();
+}
+
+// ── Generation info panel ─────────────────────────────────────────────────────
+const METHOD_DESCS = {
+  uniform:    'Needle position and angle drawn independently from uniform distributions — the classic Buffon setup.',
+  stratified: 'Y-position sampled uniformly within each floor strip, guaranteeing balanced vertical coverage and reducing crossing-rate variance.',
+  halton:     'Low-discrepancy quasi-random sequence (bases 2, 3, 5) fills the canvas more evenly than pseudorandom numbers, accelerating convergence.',
+};
+
+const elGenDesc  = document.getElementById('genMethodDesc');
+const elGenStats = document.getElementById('genMethodStats');
+
+function statRow(label, value) {
+  return `<div class="gen-stat-row"><span>${label}</span><span class="gen-stat-val">${value}</span></div>`;
+}
+
+function updateMethodInfo() {
+  elGenDesc.textContent = METHOD_DESCS[generationMethod];
+
+  const L = needleRatio * LINE_SPACING;
+  const expectedRate = (2 * L) / (Math.PI * LINE_SPACING);
+  const actualRate   = drops > 0 ? crossings / drops : 0;
+
+  if (generationMethod === 'uniform' || generationMethod === 'halton') {
+    let html = statRow('Crossing rate (actual)', drops > 0 ? actualRate.toFixed(4) : '—');
+    html    += statRow('Crossing rate (expected)', expectedRate.toFixed(4));
+    if (generationMethod === 'halton') {
+      html += statRow('Sequence index', haltonIndex.toLocaleString());
+    }
+    elGenStats.innerHTML = html;
+
+  } else if (generationMethod === 'stratified') {
+    const counts  = stripCounts.slice(0, numStrips);
+    const total   = counts.reduce((a, b) => a + b, 0);
+    const mean    = total / numStrips || 0;
+    const variance = counts.reduce((a, b) => a + (b - mean) ** 2, 0) / numStrips;
+    const stdDev  = Math.sqrt(variance);
+
+    // Mini bar chart
+    const maxCount = Math.max(...counts, 1);
+    const bars = counts.map(c => {
+      const pct = Math.round((c / maxCount) * 100);
+      return `<div class="strip-bar" style="height:${pct}%" title="${c} drops"></div>`;
+    }).join('');
+
+    let html  = statRow('Strip std dev', mean > 0 ? ((stdDev / mean * 100).toFixed(1) + '% of mean') : '—');
+    html     += statRow('Crossing rate (actual)', drops > 0 ? actualRate.toFixed(4) : '—');
+    html     += `<div class="strip-bars">${bars}</div>`;
+    elGenStats.innerHTML = html;
   }
 }
 
@@ -235,6 +313,7 @@ sliderStrips.addEventListener('input', () => {
   running = false;
   cancelAnimationFrame(animId);
   drops = 0; crossings = 0; needles = []; piHistory = []; lastSample = 0;
+  haltonIndex = 0; stripCounts = new Array(numStrips).fill(0);
   btnStart.disabled = false;
   btnStart.textContent = 'Start';
   btnPause.disabled = true;
@@ -272,6 +351,8 @@ btnReset.addEventListener('click', () => {
   needles   = [];
   piHistory = [];
   lastSample = 0;
+  haltonIndex = 0;
+  stripCounts = new Array(numStrips).fill(0);
   btnStart.disabled = false;
   btnStart.textContent = 'Start';
   btnPause.disabled = true;
@@ -280,12 +361,19 @@ btnReset.addEventListener('click', () => {
   drawChart();
 });
 
+const selectMethod = document.getElementById('genMethod');
+selectMethod.addEventListener('change', () => {
+  generationMethod = selectMethod.value;
+  btnReset.click();
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('resize', resizeCanvases);
 resizeCanvases();
 updateStats();
 
 // Set initial label values
+stripCounts = new Array(numStrips).fill(0);
 needleRatio = parseFloat(sliderLen.value);
 labelLen.textContent = needleRatio.toFixed(2) + '× spacing';
 const initSpeed = parseInt(sliderSpd.value);
