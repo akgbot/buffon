@@ -14,12 +14,51 @@
 
   <main>
     <section class="canvas-section">
-      <canvas id="simCanvas"></canvas>
+      <div class="sim-panels">
+        <div class="sim-panel" id="panel-uniform">
+          <div class="sim-label" style="color:#63b3ed">Uniform Random</div>
+          <canvas id="canvas-uniform"></canvas>
+        </div>
+        <div class="sim-panel" id="panel-stratified" hidden>
+          <div class="sim-label" style="color:#48bb78">Stratified</div>
+          <canvas id="canvas-stratified"></canvas>
+        </div>
+        <div class="sim-panel" id="panel-halton" hidden>
+          <div class="sim-label" style="color:#b794f4">Halton Sequence</div>
+          <canvas id="canvas-halton"></canvas>
+        </div>
+      </div>
     </section>
 
     <aside class="panel">
       <section class="controls">
-        <h2>Controls</h2>
+        <h2>Needle Generation Methods</h2>
+
+        <div class="method-toggles">
+          <div class="method-toggle-row">
+            <label class="method-toggle">
+              <input type="checkbox" id="toggle-uniform" checked>
+              <span style="color:#63b3ed">Uniform Random</span>
+            </label>
+          </div>
+          <div class="method-info">Needle position and angle drawn independently from uniform distributions — the classic Buffon setup.</div>
+
+          <div class="method-toggle-row">
+            <label class="method-toggle">
+              <input type="checkbox" id="toggle-stratified">
+              <span style="color:#48bb78">Stratified</span>
+            </label>
+          </div>
+          <div class="method-info">Y-position sampled uniformly within each floor strip, guaranteeing balanced vertical coverage and reducing crossing-rate variance.</div>
+
+          <div class="method-toggle-row">
+            <label class="method-toggle">
+              <input type="checkbox" id="toggle-halton">
+              <span style="color:#b794f4">Halton Sequence</span>
+            </label>
+          </div>
+          <div class="method-info">Low-discrepancy quasi-random sequence (bases 2, 3, 5) fills the canvas more evenly than pseudorandom numbers, accelerating convergence.</div>
+        </div>
 
         <label>
           Needle length
@@ -39,15 +78,6 @@
           <input type="range" id="speed" min="1" max="5" step="1" value="3">
         </label>
 
-        <label>
-          Generation method
-          <select id="genMethod" class="method-select">
-            <option value="uniform">Uniform random</option>
-            <option value="stratified">Stratified</option>
-            <option value="halton">Halton sequence</option>
-          </select>
-        </label>
-
         <div class="buttons">
           <button id="btnStart" class="btn primary">Start</button>
           <button id="btnPause" class="btn" disabled>Pause</button>
@@ -57,19 +87,36 @@
 
       <section class="stats">
         <h2>Statistics</h2>
-        <dl>
-          <dt>Total Drops</dt>
-          <dd id="statDrops">0</dd>
-
-          <dt>Crossings</dt>
-          <dd id="statCrossings">0</dd>
-
-          <dt>Estimated π</dt>
-          <dd id="statPi">—</dd>
-
-          <dt>Error</dt>
-          <dd id="statError">—</dd>
-        </dl>
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th data-method="uniform" style="color:#63b3ed">Uniform</th>
+              <th data-method="stratified" style="color:#48bb78">Stratified</th>
+              <th data-method="halton" style="color:#b794f4">Halton</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="stat-label">Drops</td>
+              <td data-method="uniform" id="stat-drops-uniform">0</td>
+              <td data-method="stratified" id="stat-drops-stratified">0</td>
+              <td data-method="halton" id="stat-drops-halton">0</td>
+            </tr>
+            <tr>
+              <td class="stat-label">π est.</td>
+              <td data-method="uniform" id="stat-pi-uniform" class="stat-pi">—</td>
+              <td data-method="stratified" id="stat-pi-stratified" class="stat-pi">—</td>
+              <td data-method="halton" id="stat-pi-halton" class="stat-pi">—</td>
+            </tr>
+            <tr>
+              <td class="stat-label">Error</td>
+              <td data-method="uniform" id="stat-error-uniform" class="stat-error">—</td>
+              <td data-method="stratified" id="stat-error-stratified" class="stat-error">—</td>
+              <td data-method="halton" id="stat-error-halton" class="stat-error">—</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
       <section class="rand-metrics">
@@ -92,12 +139,6 @@
           <p>Lag-1 Pearson correlation of the last 500 crossing results. The significance threshold for zero correlation is roughly 1/√500 ≈ 0.045. Thresholds: green |r|&lt;0.05, yellow 0.05–0.12, red &gt;0.12.</p>
         </div>
         <div id="randMetrics"></div>
-      </section>
-
-      <section class="gen-info">
-        <h2>Generation info</h2>
-        <p id="genMethodDesc" class="gen-desc"></p>
-        <div id="genMethodStats" class="gen-stats"></div>
       </section>
 
       <section class="chart-section">
