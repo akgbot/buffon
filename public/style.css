@@ -164,6 +164,15 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: not-allowed;
 }
 
+.btn-zoom {
+  flex: none;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+
 /* Stats */
 dl {
   display: grid;
