@@ -1,41 +1,54 @@
 'use strict';
 
+// ── Method configuration ───────────────────────────────────────────────────────
+const METHOD_KEYS   = ['uniform', 'stratified', 'halton', 'pointfilter'];
+const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b794f4', pointfilter: '#f6ad55' };
+const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton', pointfilter: 'Point-filter' };
+
 // ── Canvas setup ──────────────────────────────────────────────────────────────
-const simCanvas  = document.getElementById('simCanvas');
 const chartCanvas = document.getElementById('chartCanvas');
-const simCtx     = simCanvas.getContext('2d');
-const chartCtx   = chartCanvas.getContext('2d');
+const chartCtx    = chartCanvas.getContext('2d');
+
+const canvases = {};
+const contexts = {};
+for (const key of METHOD_KEYS) {
+  canvases[key] = document.getElementById('canvas-' + key);
+  contexts[key] = canvases[key].getContext('2d');
+}
 
 let numStrips    = 6;
-let LINE_SPACING = 60; // pixels between floor lines (derived from numStrips)
+let LINE_SPACING = 60;
 const MAX_NEEDLES  = 50000;
-const CHART_POINTS = 200; // samples stored for convergence chart
+const CHART_POINTS = 200;
+const GRID_N        = 8;
+const ANGLE_BINS    = 12;
+const CROSS_SEQ_LEN = 500;
 
-// ── State ─────────────────────────────────────────────────────────────────────
-let drops      = 0;
-let crossings  = 0;
-let needles    = [];        // { x1,y1,x2,y2, crosses }
-let piHistory  = [];        // sampled π estimates for chart
-let running    = false;
-let animId     = null;
-let lastSample = 0;
+// ── Per-method state ──────────────────────────────────────────────────────────
+function createMethodState() {
+  return {
+    drops: 0,
+    crossings: 0,
+    needles: [],
+    piHistory: [],
+    lastSample: 0,
+    haltonIndex: 0,
+    stripCounts: new Array(numStrips).fill(0),
+    gridCounts:  new Array(GRID_N * GRID_N).fill(0),
+    angleCounts: new Array(ANGLE_BINS).fill(0),
+    crossingSeq: [],
+  };
+}
 
-// Settings (updated from controls)
-let needleRatio = 0.8;      // L = needleRatio * LINE_SPACING
-let dropsPerFrame = 5;      // controlled by speed slider
+const methodStates = {};
+for (const key of METHOD_KEYS) methodStates[key] = createMethodState();
 
-// ── Generation method ─────────────────────────────────────────────────────────
-let generationMethod = 'uniform';
-let haltonIndex = 0;
-let stripCounts = [];
-
-// ── Randomness metric state ───────────────────────────────────────────────────
-const GRID_N        = 8;           // 8×8 = 64 spatial bins
-const ANGLE_BINS    = 12;          // 15° bins over [0, π]
-const CROSS_SEQ_LEN = 500;         // crossing history for autocorrelation
-let gridCounts   = [];
-let angleCounts  = [];
-let crossingSeq  = [];             // ring buffer of 0/1
+// ── Shared settings ───────────────────────────────────────────────────────────
+let running       = false;
+let animId        = null;
+let needleRatio   = 0.8;
+let dropsPerFrame = 5;
+const enabledMethods = new Set(['uniform']);
 
 function halton(index, base) {
   let result = 0, f = 1;
@@ -43,67 +56,77 @@ function halton(index, base) {
   return result;
 }
 
-// ── Speed map ─────────────────────────────────────────────────────────────────
 const SPEED_MAP = {
-  1: { dpf: 1,    label: 'Slow'    },
-  2: { dpf: 3,    label: 'Medium–' },
-  3: { dpf: 10,   label: 'Medium'  },
-  4: { dpf: 50,   label: 'Fast'    },
-  5: { dpf: 300,  label: 'Turbo'   },
+  1: { dpf: 1,   label: 'Slow'    },
+  2: { dpf: 3,   label: 'Medium–' },
+  3: { dpf: 10,  label: 'Medium'  },
+  4: { dpf: 50,  label: 'Fast'    },
+  5: { dpf: 300, label: 'Turbo'   },
 };
 
-// ── Resize canvas to fill its container ───────────────────────────────────────
+// ── Resize canvases ───────────────────────────────────────────────────────────
 function resizeCanvases() {
-  const section = simCanvas.parentElement;
-  const size    = Math.min(section.clientWidth, section.clientHeight) - 32;
-  simCanvas.width  = size;
-  simCanvas.height = size;
+  const section  = document.querySelector('.canvas-section');
+  const count    = Math.max(1, enabledMethods.size);
+  const availW   = Math.floor(section.clientWidth / count) - 24;
+  const availH   = section.clientHeight - 56;
+  const size     = Math.max(10, Math.min(availW, availH));
+
+  for (const key of METHOD_KEYS) {
+    canvases[key].width  = size;
+    canvases[key].height = size;
+  }
   LINE_SPACING = size / numStrips;
 
   const chartSection = chartCanvas.parentElement;
   chartCanvas.width  = chartSection.clientWidth - 40;
   chartCanvas.height = 100;
 
-  drawFloor();
-  redrawNeedles();
+  for (const key of METHOD_KEYS) {
+    drawFloor(key);
+    redrawNeedles(key);
+  }
   drawChart();
 }
 
-// ── Floor lines ───────────────────────────────────────────────────────────────
-function drawFloor() {
-  const { width, height } = simCanvas;
-  simCtx.clearRect(0, 0, width, height);
-  simCtx.strokeStyle = '#2a2d3e';
-  simCtx.lineWidth   = 1;
+// ── Floor and needle drawing ──────────────────────────────────────────────────
+function drawFloor(key) {
+  const ctx = contexts[key];
+  const { width, height } = canvases[key];
+  ctx.clearRect(0, 0, width, height);
+  ctx.strokeStyle = '#2a2d3e';
+  ctx.lineWidth   = 1;
   for (let y = LINE_SPACING; y < height; y += LINE_SPACING) {
-    simCtx.beginPath();
-    simCtx.moveTo(0, y);
-    simCtx.lineTo(width, y);
-    simCtx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
   }
 }
 
-// ── Redraw all stored needles ─────────────────────────────────────────────────
-function redrawNeedles() {
-  for (const n of needles) drawNeedle(n);
+function drawNeedle(key, { x1, y1, x2, y2, crosses }) {
+  const ctx = contexts[key];
+  ctx.strokeStyle = crosses ? 'rgba(255,101,132,0.55)' : 'rgba(99,179,237,0.45)';
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
 }
 
-function drawNeedle({ x1, y1, x2, y2, crosses }) {
-  simCtx.strokeStyle = crosses ? 'rgba(255,101,132,0.55)' : 'rgba(99,179,237,0.45)';
-  simCtx.lineWidth   = 1.5;
-  simCtx.beginPath();
-  simCtx.moveTo(x1, y1);
-  simCtx.lineTo(x2, y2);
-  simCtx.stroke();
+function redrawNeedles(key) {
+  for (const n of methodStates[key].needles) drawNeedle(key, n);
 }
 
 // ── Drop one needle ───────────────────────────────────────────────────────────
-function dropNeedle() {
-  const L     = needleRatio * LINE_SPACING;
-  const { width, height } = simCanvas;
+function dropNeedle(method) {
+  const state  = methodStates[method];
+  const canvas = canvases[method];
+  const L      = needleRatio * LINE_SPACING;
+  const { width, height } = canvas;
   let x1, y1, x2, y2, crosses, theta, trackX, trackY;
 
-  if (generationMethod === 'pointfilter') {
+  if (method === 'pointfilter') {
     // Pick a random starting point
     x1 = Math.random() * width;
     y1 = Math.random() * height;
@@ -135,20 +158,19 @@ function dropNeedle() {
 
     trackX = x1;
     trackY = y1;
-
   } else {
     let cx, cy;
-    if (generationMethod === 'stratified') {
+    if (method === 'stratified') {
       const strip = Math.floor(Math.random() * numStrips);
-      stripCounts[strip] = (stripCounts[strip] || 0) + 1;
+      state.stripCounts[strip] = (state.stripCounts[strip] || 0) + 1;
       cy    = (strip + Math.random()) * LINE_SPACING;
       cx    = Math.random() * width;
       theta = Math.random() * Math.PI;
-    } else if (generationMethod === 'halton') {
-      cx    = halton(haltonIndex, 2) * width;
-      cy    = halton(haltonIndex, 3) * height;
-      theta = halton(haltonIndex, 5) * Math.PI;
-      haltonIndex++;
+    } else if (method === 'halton') {
+      cx    = halton(state.haltonIndex, 2) * width;
+      cy    = halton(state.haltonIndex, 3) * height;
+      theta = halton(state.haltonIndex, 5) * Math.PI;
+      state.haltonIndex++;
     } else {
       cx    = Math.random() * width;
       cy    = Math.random() * height;
@@ -161,7 +183,6 @@ function dropNeedle() {
     x1 = cx - dx; y1 = cy - dy;
     x2 = cx + dx; y2 = cy + dy;
 
-    // Distance from center to nearest line (below or above)
     const distToLine = cy % LINE_SPACING;
     const minDist    = Math.min(distToLine, LINE_SPACING - distToLine);
     crosses          = (L / 2) * Math.abs(Math.sin(theta)) >= minDist;
@@ -170,61 +191,50 @@ function dropNeedle() {
     trackY = cy;
   }
 
-  // ── Randomness tracking ───────────────────────────────────────────────────
   const gx = Math.min(Math.floor(trackX / width  * GRID_N), GRID_N - 1);
   const gy = Math.min(Math.floor(trackY / height * GRID_N), GRID_N - 1);
-  gridCounts[gy * GRID_N + gx]++;
+  state.gridCounts[gy * GRID_N + gx]++;
 
   const ai = Math.min(Math.floor(theta / Math.PI * ANGLE_BINS), ANGLE_BINS - 1);
-  angleCounts[ai]++;
+  state.angleCounts[ai]++;
 
-  crossingSeq.push(crosses ? 1 : 0);
-  if (crossingSeq.length > CROSS_SEQ_LEN) crossingSeq.shift();
+  state.crossingSeq.push(crosses ? 1 : 0);
+  if (state.crossingSeq.length > CROSS_SEQ_LEN) state.crossingSeq.shift();
 
-  drops++;
-  if (crosses) crossings++;
+  state.drops++;
+  if (crosses) state.crossings++;
 
   const needle = { x1, y1, x2, y2, crosses };
-  if (needles.length < MAX_NEEDLES) needles.push(needle);
-  drawNeedle(needle);
+  if (state.needles.length < MAX_NEEDLES) state.needles.push(needle);
+  drawNeedle(method, needle);
 }
 
 // ── π estimate ────────────────────────────────────────────────────────────────
-function estimatePi() {
-  if (crossings === 0) return null;
+function estimatePi(state) {
+  if (state.crossings === 0) return null;
   const L = needleRatio * LINE_SPACING;
-  return (2 * L * drops) / (LINE_SPACING * crossings);
+  return (2 * L * state.drops) / (LINE_SPACING * state.crossings);
 }
 
 // ── Stats update ──────────────────────────────────────────────────────────────
-const elDrops    = document.getElementById('statDrops');
-const elCrossings = document.getElementById('statCrossings');
-const elPi       = document.getElementById('statPi');
-const elError    = document.getElementById('statError');
-
 function updateStats() {
-  elDrops.textContent    = drops.toLocaleString();
-  elCrossings.textContent = crossings.toLocaleString();
-
-  const est = estimatePi();
-  if (est === null) {
-    elPi.textContent    = '—';
-    elError.textContent = '—';
-  } else {
-    elPi.textContent    = est.toFixed(6);
-    const err = Math.abs(est - Math.PI) / Math.PI * 100;
-    elError.textContent = err.toFixed(3) + '%';
+  for (const key of METHOD_KEYS) {
+    const state = methodStates[key];
+    document.getElementById('stat-drops-' + key).textContent = state.drops.toLocaleString();
+    const est = estimatePi(state);
+    if (est === null) {
+      document.getElementById('stat-pi-' + key).textContent    = '—';
+      document.getElementById('stat-error-' + key).textContent = '—';
+    } else {
+      document.getElementById('stat-pi-' + key).textContent    = est.toFixed(6);
+      const err = Math.abs(est - Math.PI) / Math.PI * 100;
+      document.getElementById('stat-error-' + key).textContent = err.toFixed(3) + '%';
+    }
   }
-
-  updateMethodInfo();
   updateRandMetrics();
 }
 
 // ── Randomness metrics ────────────────────────────────────────────────────────
-// Returns chi² / df for a count array, or null if not enough data.
-// For uniform random data the expected value is 1.0.
-// Values << 1 mean the distribution is too even (low discrepancy / quasi-random).
-// Values >> 1 mean clustering.
 function chiSqRatio(counts) {
   const n   = counts.reduce((a, b) => a + b, 0);
   const k   = counts.length;
@@ -234,10 +244,7 @@ function chiSqRatio(counts) {
   return chi2 / (k - 1);
 }
 
-// Lag-1 Pearson autocorrelation of the crossing sequence.
-// Ideal for i.i.d. sequence: ≈ 0.
-function lag1Autocorr() {
-  const seq = crossingSeq;
+function lag1Autocorr(seq) {
   if (seq.length < 50) return null;
   const n    = seq.length;
   const mean = seq.reduce((a, b) => a + b, 0) / n;
@@ -247,13 +254,11 @@ function lag1Autocorr() {
   return den > 0 ? num / den : 0;
 }
 
-// Returns a CSS color class based on how "random-looking" the chi²/df value is.
-// <0.3 → too uniform (quasi-random); 0.5–1.5 → good; >2.5 → clustered.
 function chiColor(r) {
   if (r === null) return 'mval-muted';
-  if (r < 0.3)   return 'mval-blue';    // suspiciously uniform
+  if (r < 0.3)   return 'mval-blue';
   if (r < 0.5)   return 'mval-teal';
-  if (r < 1.5)   return 'mval-green';   // ideal random zone
+  if (r < 1.5)   return 'mval-green';
   if (r < 2.5)   return 'mval-yellow';
   return 'mval-red';
 }
@@ -268,80 +273,50 @@ function autocorrColor(r) {
 
 const elRandMetrics = document.getElementById('randMetrics');
 
-function mrow(label, val, colorClass, note) {
-  return `<div class="mrow">
-    <span class="mlabel">${label}<span class="mnote">${note}</span></span>
-    <span class="mval ${colorClass}">${val}</span>
-  </div>`;
+function updateStatsVisibility() {
+  for (const key of METHOD_KEYS) {
+    const show = enabledMethods.has(key);
+    for (const el of document.querySelectorAll(`[data-method="${key}"]`)) {
+      el.hidden = !show;
+    }
+  }
 }
 
 function updateRandMetrics() {
-  const spatial  = chiSqRatio(gridCounts);
-  const angle    = chiSqRatio(angleCounts);
-  const autocorr = lag1Autocorr();
-
-  const fmtRatio = r => r !== null ? r.toFixed(3) : '—';
-  const fmtCorr  = r => r !== null ? (r >= 0 ? '+' : '') + r.toFixed(4) : '—';
-
-  let html = '';
-  html += mrow('Spatial χ²/df',  fmtRatio(spatial),  chiColor(spatial),   'ideal ≈ 1.0');
-  html += mrow('Angle χ²/df',    fmtRatio(angle),    chiColor(angle),     'ideal ≈ 1.0');
-  html += mrow('Serial autocorr', fmtCorr(autocorr), autocorrColor(autocorr), 'ideal ≈ 0');
-  elRandMetrics.innerHTML = html;
-}
-
-// ── Generation info panel ─────────────────────────────────────────────────────
-const METHOD_DESCS = {
-  uniform:     'Needle position and angle drawn independently from uniform distributions — the classic Buffon setup.',
-  stratified:  'Y-position sampled uniformly within each floor strip, guaranteeing balanced vertical coverage and reducing crossing-rate variance.',
-  halton:      'Low-discrepancy quasi-random sequence (bases 2, 3, 5) fills the canvas more evenly than pseudorandom numbers, accelerating convergence.',
-  pointfilter: 'Picks a random starting point, then generates candidate second points via rejection sampling inside a disk of radius L. No angle is ever computed — direction is implicit in the two endpoints.',
-};
-
-const elGenDesc  = document.getElementById('genMethodDesc');
-const elGenStats = document.getElementById('genMethodStats');
-
-function statRow(label, value) {
-  return `<div class="gen-stat-row"><span>${label}</span><span class="gen-stat-val">${value}</span></div>`;
-}
-
-function updateMethodInfo() {
-  elGenDesc.textContent = METHOD_DESCS[generationMethod];
-
-  const L = needleRatio * LINE_SPACING;
-  const expectedRate = (2 * L) / (Math.PI * LINE_SPACING);
-  const actualRate   = drops > 0 ? crossings / drops : 0;
-
-  if (generationMethod === 'uniform' || generationMethod === 'halton' || generationMethod === 'pointfilter') {
-    let html = statRow('Crossing rate (actual)', drops > 0 ? actualRate.toFixed(4) : '—');
-    html    += statRow('Crossing rate (expected)', expectedRate.toFixed(4));
-    if (generationMethod === 'halton') {
-      html += statRow('Sequence index', haltonIndex.toLocaleString());
-    }
-    if (generationMethod === 'pointfilter') {
-      html += statRow('Acceptance rate', '~78.5% (π/4)');
-    }
-    elGenStats.innerHTML = html;
-
-  } else if (generationMethod === 'stratified') {
-    const counts  = stripCounts.slice(0, numStrips);
-    const total   = counts.reduce((a, b) => a + b, 0);
-    const mean    = total / numStrips || 0;
-    const variance = counts.reduce((a, b) => a + (b - mean) ** 2, 0) / numStrips;
-    const stdDev  = Math.sqrt(variance);
-
-    // Mini bar chart
-    const maxCount = Math.max(...counts, 1);
-    const bars = counts.map(c => {
-      const pct = Math.round((c / maxCount) * 100);
-      return `<div class="strip-bar" style="height:${pct}%" title="${c} drops"></div>`;
-    }).join('');
-
-    let html  = statRow('Strip std dev', mean > 0 ? ((stdDev / mean * 100).toFixed(1) + '% of mean') : '—');
-    html     += statRow('Crossing rate (actual)', drops > 0 ? actualRate.toFixed(4) : '—');
-    html     += `<div class="strip-bars">${bars}</div>`;
-    elGenStats.innerHTML = html;
+  let html = '<table class="rand-table"><thead><tr><th></th>';
+  for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
+    html += `<th style="color:${METHOD_COLORS[key]}">${METHOD_LABELS[key]}</th>`;
   }
+  html += '</tr></thead><tbody>';
+
+  html += '<tr><td class="rand-label">Spatial χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
+  for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
+    const r = chiSqRatio(methodStates[key].gridCounts);
+    html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
+  }
+  html += '</tr>';
+
+  html += '<tr><td class="rand-label">Angle χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
+  for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
+    const r = chiSqRatio(methodStates[key].angleCounts);
+    html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
+  }
+  html += '</tr>';
+
+  html += '<tr><td class="rand-label">Serial autocorr<span class="mnote">ideal ≈ 0</span></td>';
+  for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
+    const r = lag1Autocorr(methodStates[key].crossingSeq);
+    const s = r !== null ? (r >= 0 ? '+' : '') + r.toFixed(4) : '—';
+    html += `<td class="mval ${autocorrColor(r)}">${s}</td>`;
+  }
+  html += '</tr>';
+
+  html += '</tbody></table>';
+  elRandMetrics.innerHTML = html;
 }
 
 // ── Chart zoom ────────────────────────────────────────────────────────────────
@@ -349,11 +324,12 @@ const ZOOM_LEVELS = [1.5, 0.5, 0.1, 0.02];
 let zoomIndex = 0;
 
 // ── Convergence chart ─────────────────────────────────────────────────────────
-function sampleChart() {
-  const est = estimatePi();
+function sampleChart(key) {
+  const state = methodStates[key];
+  const est   = estimatePi(state);
   if (est !== null) {
-    piHistory.push(est);
-    if (piHistory.length > CHART_POINTS) piHistory.shift();
+    state.piHistory.push(est);
+    if (state.piHistory.length > CHART_POINTS) state.piHistory.shift();
   }
 }
 
@@ -361,9 +337,6 @@ function drawChart() {
   const { width, height } = chartCanvas;
   chartCtx.clearRect(0, 0, width, height);
 
-  if (piHistory.length < 2) return;
-
-  // y range: π ± zoom
   const zoom = ZOOM_LEVELS[zoomIndex];
   const yMin = Math.PI - zoom;
   const yMax = Math.PI + zoom;
@@ -380,19 +353,22 @@ function drawChart() {
   chartCtx.stroke();
   chartCtx.setLineDash([]);
 
-  // Convergence line
-  chartCtx.strokeStyle = '#6c63ff';
-  chartCtx.lineWidth   = 1.5;
-  chartCtx.beginPath();
-  const step = width / (CHART_POINTS - 1);
-  piHistory.forEach((v, i) => {
-    const x = i * step;
-    const y = toY(Math.max(yMin, Math.min(yMax, v)));
-    i === 0 ? chartCtx.moveTo(x, y) : chartCtx.lineTo(x, y);
-  });
-  chartCtx.stroke();
+  // One line per method
+  for (const key of METHOD_KEYS) {
+    const hist = methodStates[key].piHistory;
+    if (hist.length < 2) continue;
+    chartCtx.strokeStyle = METHOD_COLORS[key];
+    chartCtx.lineWidth   = 1.5;
+    chartCtx.beginPath();
+    const step = width / (CHART_POINTS - 1);
+    hist.forEach((v, i) => {
+      const x = i * step;
+      const y = toY(Math.max(yMin, Math.min(yMax, v)));
+      i === 0 ? chartCtx.moveTo(x, y) : chartCtx.lineTo(x, y);
+    });
+    chartCtx.stroke();
+  }
 
-  // π label
   chartCtx.fillStyle = 'rgba(108,99,255,0.7)';
   chartCtx.font      = '10px monospace';
   chartCtx.fillText('π', 4, pyRef - 3);
@@ -402,34 +378,43 @@ function drawChart() {
 function step() {
   if (!running) return;
 
-  for (let i = 0; i < dropsPerFrame; i++) dropNeedle();
-
-  // Sample chart every ~200 drops
-  if (drops - lastSample >= 200) {
-    sampleChart();
-    drawChart();
-    lastSample = drops;
+  for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
+    for (let i = 0; i < dropsPerFrame; i++) dropNeedle(key);
+    const state = methodStates[key];
+    if (state.drops - state.lastSample >= 200) {
+      sampleChart(key);
+      state.lastSample = state.drops;
+    }
   }
 
+  drawChart();
   updateStats();
   animId = requestAnimationFrame(step);
 }
 
-// ── Controls ──────────────────────────────────────────────────────────────────
-const btnStart    = document.getElementById('btnStart');
-const btnPause    = document.getElementById('btnPause');
-const btnReset    = document.getElementById('btnReset');
-const sliderLen   = document.getElementById('needleLen');
-const sliderSpd   = document.getElementById('speed');
-const sliderStrips = document.getElementById('strips');
-const labelLen    = document.getElementById('needleLenLabel');
-const labelSpd    = document.getElementById('speedLabel');
-const labelStrips = document.getElementById('stripsLabel');
+// ── Reset helpers ─────────────────────────────────────────────────────────────
+function resetAllStates() {
+  for (const key of METHOD_KEYS) {
+    methodStates[key] = createMethodState();
+    drawFloor(key);
+  }
+}
 
-const btnZoom = document.getElementById('btnZoom');
-btnZoom.addEventListener('click', () => {
+// ── Controls ──────────────────────────────────────────────────────────────────
+const btnStart     = document.getElementById('btnStart');
+const btnPause     = document.getElementById('btnPause');
+const btnReset     = document.getElementById('btnReset');
+const sliderLen    = document.getElementById('needleLen');
+const sliderSpd    = document.getElementById('speed');
+const sliderStrips = document.getElementById('strips');
+const labelLen     = document.getElementById('needleLenLabel');
+const labelSpd     = document.getElementById('speedLabel');
+const labelStrips  = document.getElementById('stripsLabel');
+
+document.getElementById('btnZoom').addEventListener('click', () => {
   zoomIndex = (zoomIndex + 1) % ZOOM_LEVELS.length;
-  btnZoom.textContent = '±' + ZOOM_LEVELS[zoomIndex];
+  document.getElementById('btnZoom').textContent = '±' + ZOOM_LEVELS[zoomIndex];
   drawChart();
 });
 
@@ -441,61 +426,45 @@ sliderLen.addEventListener('input', () => {
 sliderStrips.addEventListener('input', () => {
   numStrips = parseInt(sliderStrips.value);
   labelStrips.textContent = numStrips;
-  LINE_SPACING = simCanvas.height / numStrips;
-  // Reset: existing crossings are based on old spacing
+  LINE_SPACING = canvases.uniform.width / numStrips;
   running = false;
   cancelAnimationFrame(animId);
-  drops = 0; crossings = 0; needles = []; piHistory = []; lastSample = 0;
-  haltonIndex = 0; stripCounts = new Array(numStrips).fill(0);
-  gridCounts = new Array(GRID_N * GRID_N).fill(0);
-  angleCounts = new Array(ANGLE_BINS).fill(0);
-  crossingSeq = [];
-  btnStart.disabled = false;
+  resetAllStates();
+  btnStart.disabled    = false;
   btnStart.textContent = 'Start';
-  btnPause.disabled = true;
-  drawFloor();
+  btnPause.disabled    = true;
   updateStats();
   drawChart();
 });
 
 sliderSpd.addEventListener('input', () => {
   const s = parseInt(sliderSpd.value);
-  dropsPerFrame = SPEED_MAP[s].dpf;
+  dropsPerFrame        = SPEED_MAP[s].dpf;
   labelSpd.textContent = SPEED_MAP[s].label;
 });
 
 btnStart.addEventListener('click', () => {
-  running = true;
+  running           = true;
   btnStart.disabled = true;
   btnPause.disabled = false;
   animId = requestAnimationFrame(step);
 });
 
 btnPause.addEventListener('click', () => {
-  running = false;
+  running              = false;
   cancelAnimationFrame(animId);
-  btnStart.disabled = false;
-  btnPause.disabled = true;
+  btnStart.disabled    = false;
+  btnPause.disabled    = true;
   btnStart.textContent = 'Resume';
 });
 
 btnReset.addEventListener('click', () => {
   running = false;
   cancelAnimationFrame(animId);
-  drops     = 0;
-  crossings = 0;
-  needles   = [];
-  piHistory = [];
-  lastSample = 0;
-  haltonIndex = 0;
-  stripCounts = new Array(numStrips).fill(0);
-  gridCounts = new Array(GRID_N * GRID_N).fill(0);
-  angleCounts = new Array(ANGLE_BINS).fill(0);
-  crossingSeq = [];
-  btnStart.disabled = false;
+  resetAllStates();
+  btnStart.disabled    = false;
   btnStart.textContent = 'Start';
-  btnPause.disabled = true;
-  drawFloor();
+  btnPause.disabled    = true;
   updateStats();
   drawChart();
 });
@@ -505,25 +474,33 @@ document.getElementById('btnRandInfo').addEventListener('click', () => {
   panel.hidden = !panel.hidden;
 });
 
-const selectMethod = document.getElementById('genMethod');
-selectMethod.addEventListener('change', () => {
-  generationMethod = selectMethod.value;
-  btnReset.click();
-});
+for (const key of METHOD_KEYS) {
+  document.getElementById('toggle-' + key).addEventListener('change', function () {
+    const panel = document.getElementById('panel-' + key);
+    if (this.checked) {
+      enabledMethods.add(key);
+      panel.hidden = false;
+    } else {
+      enabledMethods.delete(key);
+      panel.hidden = true;
+    }
+    updateStatsVisibility();
+    updateRandMetrics();
+    resizeCanvases();
+  });
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('resize', resizeCanvases);
 resizeCanvases();
-updateStats();
 
-// Set initial label values
-stripCounts = new Array(numStrips).fill(0);
-gridCounts  = new Array(GRID_N * GRID_N).fill(0);
-angleCounts = new Array(ANGLE_BINS).fill(0);
 needleRatio = parseFloat(sliderLen.value);
 labelLen.textContent = needleRatio.toFixed(2) + '× spacing';
 const initSpeed = parseInt(sliderSpd.value);
-dropsPerFrame = SPEED_MAP[initSpeed].dpf;
+dropsPerFrame        = SPEED_MAP[initSpeed].dpf;
 labelSpd.textContent = SPEED_MAP[initSpeed].label;
 numStrips = parseInt(sliderStrips.value);
 labelStrips.textContent = numStrips;
+
+updateStatsVisibility();
+updateStats();
