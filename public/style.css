@@ -237,6 +237,41 @@ dd {
   font-size: 0.75rem;
 }
 
+/* Randomness metric rows */
+.mrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 9px;
+}
+
+.mlabel {
+  color: var(--muted);
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mnote {
+  font-size: 0.68rem;
+  opacity: 0.65;
+}
+
+.mval {
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.mval-green  { color: #48bb78; }
+.mval-teal   { color: #38b2ac; }
+.mval-yellow { color: #ecc94b; }
+.mval-red    { color: var(--crossing); }
+.mval-blue   { color: var(--nocross); }
+.mval-muted  { color: var(--muted); }
+
 /* Generation method select */
 .method-select {
   background: var(--bg);

@@ -29,6 +29,14 @@ let generationMethod = 'uniform';
 let haltonIndex = 0;
 let stripCounts = [];
 
+// ── Randomness metric state ───────────────────────────────────────────────────
+const GRID_N        = 8;           // 8×8 = 64 spatial bins
+const ANGLE_BINS    = 12;          // 15° bins over [0, π]
+const CROSS_SEQ_LEN = 500;         // crossing history for autocorrelation
+let gridCounts   = [];
+let angleCounts  = [];
+let crossingSeq  = [];             // ring buffer of 0/1
+
 function halton(index, base) {
   let result = 0, f = 1;
   while (index > 0) { f /= base; result += f * (index % base); index = Math.floor(index / base); }
@@ -123,6 +131,17 @@ function dropNeedle() {
   const minDist    = Math.min(distToLine, LINE_SPACING - distToLine);
   const crosses    = (L / 2) * Math.abs(Math.sin(theta)) >= minDist;
 
+  // ── Randomness tracking ───────────────────────────────────────────────────
+  const gx = Math.min(Math.floor(cx / width  * GRID_N), GRID_N - 1);
+  const gy = Math.min(Math.floor(cy / height * GRID_N), GRID_N - 1);
+  gridCounts[gy * GRID_N + gx]++;
+
+  const ai = Math.min(Math.floor(theta / Math.PI * ANGLE_BINS), ANGLE_BINS - 1);
+  angleCounts[ai]++;
+
+  crossingSeq.push(crosses ? 1 : 0);
+  if (crossingSeq.length > CROSS_SEQ_LEN) crossingSeq.shift();
+
   drops++;
   if (crosses) crossings++;
 
@@ -159,6 +178,77 @@ function updateStats() {
   }
 
   updateMethodInfo();
+  updateRandMetrics();
+}
+
+// ── Randomness metrics ────────────────────────────────────────────────────────
+// Returns chi² / df for a count array, or null if not enough data.
+// For uniform random data the expected value is 1.0.
+// Values << 1 mean the distribution is too even (low discrepancy / quasi-random).
+// Values >> 1 mean clustering.
+function chiSqRatio(counts) {
+  const n   = counts.reduce((a, b) => a + b, 0);
+  const k   = counts.length;
+  const exp = n / k;
+  if (exp < 5) return null;
+  const chi2 = counts.reduce((s, c) => s + (c - exp) ** 2 / exp, 0);
+  return chi2 / (k - 1);
+}
+
+// Lag-1 Pearson autocorrelation of the crossing sequence.
+// Ideal for i.i.d. sequence: ≈ 0.
+function lag1Autocorr() {
+  const seq = crossingSeq;
+  if (seq.length < 50) return null;
+  const n    = seq.length;
+  const mean = seq.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n - 1; i++) num += (seq[i] - mean) * (seq[i + 1] - mean);
+  for (const v of seq) den += (v - mean) ** 2;
+  return den > 0 ? num / den : 0;
+}
+
+// Returns a CSS color class based on how "random-looking" the chi²/df value is.
+// <0.3 → too uniform (quasi-random); 0.5–1.5 → good; >2.5 → clustered.
+function chiColor(r) {
+  if (r === null) return 'mval-muted';
+  if (r < 0.3)   return 'mval-blue';    // suspiciously uniform
+  if (r < 0.5)   return 'mval-teal';
+  if (r < 1.5)   return 'mval-green';   // ideal random zone
+  if (r < 2.5)   return 'mval-yellow';
+  return 'mval-red';
+}
+
+function autocorrColor(r) {
+  if (r === null) return 'mval-muted';
+  const abs = Math.abs(r);
+  if (abs < 0.05) return 'mval-green';
+  if (abs < 0.12) return 'mval-yellow';
+  return 'mval-red';
+}
+
+const elRandMetrics = document.getElementById('randMetrics');
+
+function mrow(label, val, colorClass, note) {
+  return `<div class="mrow">
+    <span class="mlabel">${label}<span class="mnote">${note}</span></span>
+    <span class="mval ${colorClass}">${val}</span>
+  </div>`;
+}
+
+function updateRandMetrics() {
+  const spatial  = chiSqRatio(gridCounts);
+  const angle    = chiSqRatio(angleCounts);
+  const autocorr = lag1Autocorr();
+
+  const fmtRatio = r => r !== null ? r.toFixed(3) : '—';
+  const fmtCorr  = r => r !== null ? (r >= 0 ? '+' : '') + r.toFixed(4) : '—';
+
+  let html = '';
+  html += mrow('Spatial χ²/df',  fmtRatio(spatial),  chiColor(spatial),   'ideal ≈ 1.0');
+  html += mrow('Angle χ²/df',    fmtRatio(angle),    chiColor(angle),     'ideal ≈ 1.0');
+  html += mrow('Serial autocorr', fmtCorr(autocorr), autocorrColor(autocorr), 'ideal ≈ 0');
+  elRandMetrics.innerHTML = html;
 }
 
 // ── Generation info panel ─────────────────────────────────────────────────────
@@ -314,6 +404,9 @@ sliderStrips.addEventListener('input', () => {
   cancelAnimationFrame(animId);
   drops = 0; crossings = 0; needles = []; piHistory = []; lastSample = 0;
   haltonIndex = 0; stripCounts = new Array(numStrips).fill(0);
+  gridCounts = new Array(GRID_N * GRID_N).fill(0);
+  angleCounts = new Array(ANGLE_BINS).fill(0);
+  crossingSeq = [];
   btnStart.disabled = false;
   btnStart.textContent = 'Start';
   btnPause.disabled = true;
@@ -353,6 +446,9 @@ btnReset.addEventListener('click', () => {
   lastSample = 0;
   haltonIndex = 0;
   stripCounts = new Array(numStrips).fill(0);
+  gridCounts = new Array(GRID_N * GRID_N).fill(0);
+  angleCounts = new Array(ANGLE_BINS).fill(0);
+  crossingSeq = [];
   btnStart.disabled = false;
   btnStart.textContent = 'Start';
   btnPause.disabled = true;
@@ -374,6 +470,8 @@ updateStats();
 
 // Set initial label values
 stripCounts = new Array(numStrips).fill(0);
+gridCounts  = new Array(GRID_N * GRID_N).fill(0);
+angleCounts = new Array(ANGLE_BINS).fill(0);
 needleRatio = parseFloat(sliderLen.value);
 labelLen.textContent = needleRatio.toFixed(2) + '× spacing';
 const initSpeed = parseInt(sliderSpd.value);
