@@ -6,7 +6,8 @@ const chartCanvas = document.getElementById('chartCanvas');
 const simCtx     = simCanvas.getContext('2d');
 const chartCtx   = chartCanvas.getContext('2d');
 
-const LINE_SPACING = 60; // pixels between floor lines
+let numStrips    = 6;
+let LINE_SPACING = 60; // pixels between floor lines (derived from numStrips)
 const MAX_NEEDLES  = 50000;
 const CHART_POINTS = 200; // samples stored for convergence chart
 
@@ -38,6 +39,7 @@ function resizeCanvases() {
   const size    = Math.min(section.clientWidth, section.clientHeight) - 32;
   simCanvas.width  = size;
   simCanvas.height = size;
+  LINE_SPACING = size / numStrips;
 
   const chartSection = chartCanvas.parentElement;
   chartCanvas.width  = chartSection.clientWidth - 40;
@@ -198,17 +200,35 @@ function step() {
 }
 
 // ── Controls ──────────────────────────────────────────────────────────────────
-const btnStart  = document.getElementById('btnStart');
-const btnPause  = document.getElementById('btnPause');
-const btnReset  = document.getElementById('btnReset');
-const sliderLen = document.getElementById('needleLen');
-const sliderSpd = document.getElementById('speed');
-const labelLen  = document.getElementById('needleLenLabel');
-const labelSpd  = document.getElementById('speedLabel');
+const btnStart    = document.getElementById('btnStart');
+const btnPause    = document.getElementById('btnPause');
+const btnReset    = document.getElementById('btnReset');
+const sliderLen   = document.getElementById('needleLen');
+const sliderSpd   = document.getElementById('speed');
+const sliderStrips = document.getElementById('strips');
+const labelLen    = document.getElementById('needleLenLabel');
+const labelSpd    = document.getElementById('speedLabel');
+const labelStrips = document.getElementById('stripsLabel');
 
 sliderLen.addEventListener('input', () => {
   needleRatio = parseFloat(sliderLen.value);
   labelLen.textContent = needleRatio.toFixed(2) + '× spacing';
+});
+
+sliderStrips.addEventListener('input', () => {
+  numStrips = parseInt(sliderStrips.value);
+  labelStrips.textContent = numStrips;
+  LINE_SPACING = simCanvas.height / numStrips;
+  // Reset: existing crossings are based on old spacing
+  running = false;
+  cancelAnimationFrame(animId);
+  drops = 0; crossings = 0; needles = []; piHistory = []; lastSample = 0;
+  btnStart.disabled = false;
+  btnStart.textContent = 'Start';
+  btnPause.disabled = true;
+  drawFloor();
+  updateStats();
+  drawChart();
 });
 
 sliderSpd.addEventListener('input', () => {
@@ -259,3 +279,5 @@ labelLen.textContent = needleRatio.toFixed(2) + '× spacing';
 const initSpeed = parseInt(sliderSpd.value);
 dropsPerFrame = SPEED_MAP[initSpeed].dpf;
 labelSpd.textContent = SPEED_MAP[initSpeed].label;
+numStrips = parseInt(sliderStrips.value);
+labelStrips.textContent = numStrips;
