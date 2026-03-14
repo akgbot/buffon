@@ -101,39 +101,78 @@ function drawNeedle({ x1, y1, x2, y2, crosses }) {
 function dropNeedle() {
   const L     = needleRatio * LINE_SPACING;
   const { width, height } = simCanvas;
-  let cx, cy, theta;
+  let x1, y1, x2, y2, crosses, theta, trackX, trackY;
 
-  if (generationMethod === 'stratified') {
-    const strip = Math.floor(Math.random() * numStrips);
-    stripCounts[strip] = (stripCounts[strip] || 0) + 1;
-    cy    = (strip + Math.random()) * LINE_SPACING;
-    cx    = Math.random() * width;
-    theta = Math.random() * Math.PI;
-  } else if (generationMethod === 'halton') {
-    cx    = halton(haltonIndex, 2) * width;
-    cy    = halton(haltonIndex, 3) * height;
-    theta = halton(haltonIndex, 5) * Math.PI;
-    haltonIndex++;
+  if (generationMethod === 'pointfilter') {
+    // Pick a random starting point
+    x1 = Math.random() * width;
+    y1 = Math.random() * height;
+
+    // Rejection-sample a vector inside the disk of radius L from a bounding square
+    let dx, dy;
+    do {
+      dx = (Math.random() * 2 - 1) * L;
+      dy = (Math.random() * 2 - 1) * L;
+    } while (dx * dx + dy * dy > L * L);
+
+    // Normalize to exact length L (the "filter" step)
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-12) { dx = L; dy = 0; }
+    else { dx = (dx / len) * L; dy = (dy / len) * L; }
+
+    x2 = x1 + dx;
+    y2 = y1 + dy;
+
+    // Crossing detection via endpoints — no angle needed
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    const firstLine = Math.ceil(minY / LINE_SPACING) * LINE_SPACING;
+    crosses = firstLine <= maxY;
+
+    // Derive implicit angle for angle-bin tracking: fold atan2 to [0, π)
+    theta = Math.atan2(dy, dx);
+    if (theta < 0) theta += Math.PI;
+
+    trackX = x1;
+    trackY = y1;
+
   } else {
-    cx    = Math.random() * width;
-    cy    = Math.random() * height;
-    theta = Math.random() * Math.PI;
+    let cx, cy;
+    if (generationMethod === 'stratified') {
+      const strip = Math.floor(Math.random() * numStrips);
+      stripCounts[strip] = (stripCounts[strip] || 0) + 1;
+      cy    = (strip + Math.random()) * LINE_SPACING;
+      cx    = Math.random() * width;
+      theta = Math.random() * Math.PI;
+    } else if (generationMethod === 'halton') {
+      cx    = halton(haltonIndex, 2) * width;
+      cy    = halton(haltonIndex, 3) * height;
+      theta = halton(haltonIndex, 5) * Math.PI;
+      haltonIndex++;
+    } else {
+      cx    = Math.random() * width;
+      cy    = Math.random() * height;
+      theta = Math.random() * Math.PI;
+    }
+
+    const dx = (L / 2) * Math.cos(theta);
+    const dy = (L / 2) * Math.sin(theta);
+
+    x1 = cx - dx; y1 = cy - dy;
+    x2 = cx + dx; y2 = cy + dy;
+
+    // Distance from center to nearest line (below or above)
+    const distToLine = cy % LINE_SPACING;
+    const minDist    = Math.min(distToLine, LINE_SPACING - distToLine);
+    crosses          = (L / 2) * Math.abs(Math.sin(theta)) >= minDist;
+
+    trackX = cx;
+    trackY = cy;
   }
 
-  const dx = (L / 2) * Math.cos(theta);
-  const dy = (L / 2) * Math.sin(theta);
-
-  const x1 = cx - dx, y1 = cy - dy;
-  const x2 = cx + dx, y2 = cy + dy;
-
-  // Distance from center to nearest line (below or above)
-  const distToLine = cy % LINE_SPACING;
-  const minDist    = Math.min(distToLine, LINE_SPACING - distToLine);
-  const crosses    = (L / 2) * Math.abs(Math.sin(theta)) >= minDist;
-
   // ── Randomness tracking ───────────────────────────────────────────────────
-  const gx = Math.min(Math.floor(cx / width  * GRID_N), GRID_N - 1);
-  const gy = Math.min(Math.floor(cy / height * GRID_N), GRID_N - 1);
+  const gx = Math.min(Math.floor(trackX / width  * GRID_N), GRID_N - 1);
+  const gy = Math.min(Math.floor(trackY / height * GRID_N), GRID_N - 1);
   gridCounts[gy * GRID_N + gx]++;
 
   const ai = Math.min(Math.floor(theta / Math.PI * ANGLE_BINS), ANGLE_BINS - 1);
@@ -253,9 +292,10 @@ function updateRandMetrics() {
 
 // ── Generation info panel ─────────────────────────────────────────────────────
 const METHOD_DESCS = {
-  uniform:    'Needle position and angle drawn independently from uniform distributions — the classic Buffon setup.',
-  stratified: 'Y-position sampled uniformly within each floor strip, guaranteeing balanced vertical coverage and reducing crossing-rate variance.',
-  halton:     'Low-discrepancy quasi-random sequence (bases 2, 3, 5) fills the canvas more evenly than pseudorandom numbers, accelerating convergence.',
+  uniform:     'Needle position and angle drawn independently from uniform distributions — the classic Buffon setup.',
+  stratified:  'Y-position sampled uniformly within each floor strip, guaranteeing balanced vertical coverage and reducing crossing-rate variance.',
+  halton:      'Low-discrepancy quasi-random sequence (bases 2, 3, 5) fills the canvas more evenly than pseudorandom numbers, accelerating convergence.',
+  pointfilter: 'Picks a random starting point, then generates candidate second points via rejection sampling inside a disk of radius L. No angle is ever computed — direction is implicit in the two endpoints.',
 };
 
 const elGenDesc  = document.getElementById('genMethodDesc');
@@ -272,11 +312,14 @@ function updateMethodInfo() {
   const expectedRate = (2 * L) / (Math.PI * LINE_SPACING);
   const actualRate   = drops > 0 ? crossings / drops : 0;
 
-  if (generationMethod === 'uniform' || generationMethod === 'halton') {
+  if (generationMethod === 'uniform' || generationMethod === 'halton' || generationMethod === 'pointfilter') {
     let html = statRow('Crossing rate (actual)', drops > 0 ? actualRate.toFixed(4) : '—');
     html    += statRow('Crossing rate (expected)', expectedRate.toFixed(4));
     if (generationMethod === 'halton') {
       html += statRow('Sequence index', haltonIndex.toLocaleString());
+    }
+    if (generationMethod === 'pointfilter') {
+      html += statRow('Acceptance rate', '~78.5% (π/4)');
     }
     elGenStats.innerHTML = html;
 
