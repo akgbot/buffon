@@ -272,6 +272,59 @@ dd {
 .mval-blue   { color: var(--nocross); }
 .mval-muted  { color: var(--muted); }
 
+/* Info button */
+.btn-info {
+  flex: none;
+  padding: 1px 7px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  vertical-align: middle;
+  margin-left: 8px;
+  border-radius: 50%;
+  line-height: 1.4;
+}
+
+/* Expandable info panel */
+.info-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.info-panel p { margin-bottom: 8px; }
+.info-panel p:last-child { margin-bottom: 0; }
+
+.info-subhead {
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 10px !important;
+  margin-bottom: 3px !important;
+}
+
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.info-table th {
+  text-align: left;
+  color: var(--text);
+  font-weight: 600;
+  padding: 3px 6px 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.info-table td {
+  padding: 4px 6px 4px 0;
+  vertical-align: top;
+}
+
 /* Generation method select */
 .method-select {
   background: var(--bg);

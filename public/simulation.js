@@ -457,6 +457,11 @@ btnReset.addEventListener('click', () => {
   drawChart();
 });
 
+document.getElementById('btnRandInfo').addEventListener('click', () => {
+  const panel = document.getElementById('randInfoPanel');
+  panel.hidden = !panel.hidden;
+});
+
 const selectMethod = document.getElementById('genMethod');
 selectMethod.addEventListener('change', () => {
   generationMethod = selectMethod.value;
