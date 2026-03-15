@@ -49,6 +49,8 @@ for (const key of METHOD_KEYS) methodStates[key] = createMethodState();
 // ── Shared settings ───────────────────────────────────────────────────────────
 let running       = false;
 let animId        = null;
+let runtimeStart  = null;
+let runtimeOffset = 0;
 let needleRatio   = 0.8;
 let dropsPerFrame = 5;
 const enabledMethods = new Set(['uniform', 'pointfilter']);
@@ -222,6 +224,17 @@ function estimatePi(state) {
 
 // ── Stats update ──────────────────────────────────────────────────────────────
 function updateStats() {
+  if (runtimeStart !== null) {
+    const totalMs = runtimeOffset + (performance.now() - runtimeStart);
+    const totalSec = Math.floor(totalMs / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const display = h > 0
+      ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+      : `${m}:${String(s).padStart(2,'0')}`;
+    document.getElementById('runtimeDisplay').textContent = display;
+  }
   for (const key of METHOD_KEYS) {
     const state = methodStates[key];
     document.getElementById('stat-drops-' + key).textContent = state.drops.toLocaleString();
@@ -571,6 +584,7 @@ sliderSpd.addEventListener('input', () => {
 
 btnStart.addEventListener('click', () => {
   running           = true;
+  runtimeStart      = performance.now();
   btnStart.disabled = true;
   btnPause.disabled = false;
   animId = requestAnimationFrame(step);
@@ -579,14 +593,19 @@ btnStart.addEventListener('click', () => {
 btnPause.addEventListener('click', () => {
   running              = false;
   cancelAnimationFrame(animId);
+  runtimeOffset       += performance.now() - runtimeStart;
+  runtimeStart         = null;
   btnStart.disabled    = false;
   btnPause.disabled    = true;
   btnStart.textContent = 'Resume';
 });
 
 btnReset.addEventListener('click', () => {
-  running = false;
+  running       = false;
   cancelAnimationFrame(animId);
+  runtimeStart  = null;
+  runtimeOffset = 0;
+  document.getElementById('runtimeDisplay').textContent = '0:00';
   resetAllStates();
   btnStart.disabled    = false;
   btnStart.textContent = 'Start';
