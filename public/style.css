@@ -48,6 +48,15 @@ main {
   height: calc(100vh - 72px);
 }
 
+/* ── Canvas column ── */
+.canvas-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
 /* ── Canvas ── */
 .canvas-section {
   flex: 1;
@@ -325,7 +334,20 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* Chart */
-.chart-section { padding-bottom: 14px; }
+.chart-section {
+  padding: 16px 20px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.chart-section h2 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
 
 #chartCanvas {
   width: 100%;
@@ -515,6 +537,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 @media (max-width: 900px) {
   main { flex-direction: column; height: auto; }
+  .canvas-column { width: 100%; }
   .canvas-section { height: 60vw; min-height: 280px; }
   .panel { width: 100%; border-left: none; border-top: 1px solid var(--border); }
   .sim-panels { gap: 6px; }
