@@ -286,42 +286,63 @@ function updateStatsVisibility() {
   }
 }
 
+function makeCell(tag, text, cssClass, style) {
+  const el = document.createElement(tag);
+  if (cssClass) el.className = cssClass;
+  if (style)    el.style.cssText = style;
+  el.textContent = text;
+  return el;
+}
+
 function updateRandMetrics() {
   const enabledKeys = METHOD_KEYS.filter(k => enabledMethods.has(k));
   const numCols = enabledKeys.length + 1;
-  let html = '<table class="rand-table"><thead><tr><th></th>';
-  for (const key of enabledKeys) {
-    html += `<th style="color:${METHOD_COLORS[key]}">${METHOD_LABELS[key]}</th>`;
-  }
-  html += '</tr></thead><tbody>';
 
-  html += '<tr><td class="rand-label">Spatial χ²/df</td>';
-  for (const key of enabledKeys) {
-    const r = chiSqRatio(methodStates[key].gridCounts);
-    html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
-  }
-  html += '</tr>';
-  html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="spatialChiCanvas" class="stat-inline-chart"></canvas></td></tr>`;
+  const table = document.createElement('table');
+  table.className = 'rand-table';
 
-  html += '<tr><td class="rand-label">Angle χ²/df</td>';
+  // Header row
+  const thead = table.createTHead();
+  const hrow  = thead.insertRow();
+  hrow.appendChild(makeCell('th', ''));
   for (const key of enabledKeys) {
-    const r = chiSqRatio(methodStates[key].angleCounts);
-    html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
+    hrow.appendChild(makeCell('th', METHOD_LABELS[key], '', `color:${METHOD_COLORS[key]}`));
   }
-  html += '</tr>';
-  html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="angleChiCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
-  html += '<tr><td class="rand-label">Serial autocorr</td>';
-  for (const key of enabledKeys) {
-    const r = lag1Autocorr(methodStates[key].crossingSeq);
-    const s = r !== null ? (r >= 0 ? '+' : '') + r.toFixed(4) : '—';
-    html += `<td class="mval ${autocorrColor(r)}">${s}</td>`;
+  const tbody = table.createTBody();
+
+  // Adds a value row + a chart row beneath it
+  function addMetricRows(label, canvasId, valueFn, colorFn) {
+    const row = tbody.insertRow();
+    row.appendChild(makeCell('td', label, 'rand-label'));
+    for (const key of enabledKeys) {
+      const r = valueFn(key);
+      row.appendChild(makeCell('td', r !== null ? r.display : '—', `mval ${colorFn(r !== null ? r.value : null)}`));
+    }
+    const chartRow  = tbody.insertRow();
+    chartRow.className = 'rand-chart-row';
+    const chartCell = document.createElement('td');
+    chartCell.colSpan = numCols;
+    const canvas = document.createElement('canvas');
+    canvas.id        = canvasId;
+    canvas.className = 'stat-inline-chart';
+    chartCell.appendChild(canvas);
+    chartRow.appendChild(chartCell);
   }
-  html += '</tr>';
-  html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="autocorrCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
-  html += '</tbody></table>';
-  elRandMetrics.innerHTML = html;
+  addMetricRows('Spatial χ²/df', 'spatialChiCanvas',
+    key => { const v = chiSqRatio(methodStates[key].gridCounts);    return v !== null ? { value: v, display: v.toFixed(3) } : null; },
+    chiColor);
+
+  addMetricRows('Angle χ²/df', 'angleChiCanvas',
+    key => { const v = chiSqRatio(methodStates[key].angleCounts);   return v !== null ? { value: v, display: v.toFixed(3) } : null; },
+    chiColor);
+
+  addMetricRows('Serial autocorr', 'autocorrCanvas',
+    key => { const v = lag1Autocorr(methodStates[key].crossingSeq); return v !== null ? { value: v, display: (v >= 0 ? '+' : '') + v.toFixed(4) } : null; },
+    autocorrColor);
+
+  elRandMetrics.replaceChildren(table);
   sizeAndDrawStatCharts();
 }
 
