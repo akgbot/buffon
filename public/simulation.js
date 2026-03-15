@@ -6,8 +6,14 @@ const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b79
 const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton', pointfilter: 'Point-filter' };
 
 // ── Canvas setup ──────────────────────────────────────────────────────────────
-const chartCanvas = document.getElementById('chartCanvas');
-const chartCtx    = chartCanvas.getContext('2d');
+const chartCanvas       = document.getElementById('chartCanvas');
+const chartCtx          = chartCanvas.getContext('2d');
+const spatialChiCanvas  = document.getElementById('spatialChiCanvas');
+const spatialChiCtx     = spatialChiCanvas.getContext('2d');
+const angleChiCanvas    = document.getElementById('angleChiCanvas');
+const angleChiCtx       = angleChiCanvas.getContext('2d');
+const autocorrCanvas    = document.getElementById('autocorrCanvas');
+const autocorrCtx       = autocorrCanvas.getContext('2d');
 
 const canvases = {};
 const contexts = {};
@@ -31,6 +37,9 @@ function createMethodState() {
     crossings: 0,
     needles: [],
     piHistory: [],
+    spatialChiHistory: [],
+    angleChiHistory: [],
+    autocorrHistory: [],
     lastSample: 0,
     haltonIndex: 0,
     stripCounts: new Array(numStrips).fill(0),
@@ -82,11 +91,17 @@ function resizeCanvases() {
   chartCanvas.width  = chartSection.clientWidth - 40;
   chartCanvas.height = 100;
 
+  for (const statCanvas of [spatialChiCanvas, angleChiCanvas, autocorrCanvas]) {
+    statCanvas.width  = statCanvas.parentElement.clientWidth - 40;
+    statCanvas.height = 100;
+  }
+
   for (const key of METHOD_KEYS) {
     drawFloor(key);
     redrawNeedles(key);
   }
   drawChart();
+  drawStatCharts();
 }
 
 // ── Floor and needle drawing ──────────────────────────────────────────────────
@@ -331,6 +346,24 @@ function sampleChart(key) {
     state.piHistory.push(est);
     if (state.piHistory.length > CHART_POINTS) state.piHistory.shift();
   }
+
+  const sc = chiSqRatio(state.gridCounts);
+  if (sc !== null) {
+    state.spatialChiHistory.push(sc);
+    if (state.spatialChiHistory.length > CHART_POINTS) state.spatialChiHistory.shift();
+  }
+
+  const ac = chiSqRatio(state.angleCounts);
+  if (ac !== null) {
+    state.angleChiHistory.push(ac);
+    if (state.angleChiHistory.length > CHART_POINTS) state.angleChiHistory.shift();
+  }
+
+  const corr = lag1Autocorr(state.crossingSeq);
+  if (corr !== null) {
+    state.autocorrHistory.push(corr);
+    if (state.autocorrHistory.length > CHART_POINTS) state.autocorrHistory.shift();
+  }
 }
 
 function drawChart() {
@@ -374,6 +407,55 @@ function drawChart() {
   chartCtx.fillText('π', 4, pyRef - 3);
 }
 
+// ── Randomness stat charts ─────────────────────────────────────────────────────
+function drawStatChart(canvas, ctx, getHistory, yMin, yMax, refVal, refLabel) {
+  const { width, height } = canvas;
+  ctx.clearRect(0, 0, width, height);
+
+  const toY = v => height - ((v - yMin) / (yMax - yMin)) * height;
+  const refY = Math.max(0, Math.min(height, toY(refVal)));
+
+  // Reference line
+  ctx.strokeStyle = 'rgba(108,99,255,0.4)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(0, refY);
+  ctx.lineTo(width, refY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = 'rgba(108,99,255,0.7)';
+  ctx.font      = '10px monospace';
+  ctx.fillText(refLabel, 4, refY - 3);
+
+  // One line per method
+  for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
+    const hist = getHistory(key);
+    if (hist.length < 2) continue;
+    ctx.strokeStyle = METHOD_COLORS[key];
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    const step = width / (CHART_POINTS - 1);
+    hist.forEach((v, i) => {
+      const x = i * step;
+      const y = toY(Math.max(yMin, Math.min(yMax, v)));
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+}
+
+function drawStatCharts() {
+  drawStatChart(spatialChiCanvas, spatialChiCtx,
+    key => methodStates[key].spatialChiHistory, 0, 3, 1, '1');
+  drawStatChart(angleChiCanvas, angleChiCtx,
+    key => methodStates[key].angleChiHistory, 0, 3, 1, '1');
+  drawStatChart(autocorrCanvas, autocorrCtx,
+    key => methodStates[key].autocorrHistory, -0.3, 0.3, 0, '0');
+}
+
 // ── Animation loop ────────────────────────────────────────────────────────────
 function step() {
   if (!running) return;
@@ -389,6 +471,7 @@ function step() {
   }
 
   drawChart();
+  drawStatCharts();
   updateStats();
   animId = requestAnimationFrame(step);
 }
@@ -435,6 +518,7 @@ sliderStrips.addEventListener('input', () => {
   btnPause.disabled    = true;
   updateStats();
   drawChart();
+  drawStatCharts();
 });
 
 sliderSpd.addEventListener('input', () => {
@@ -467,6 +551,7 @@ btnReset.addEventListener('click', () => {
   btnPause.disabled    = true;
   updateStats();
   drawChart();
+  drawStatCharts();
 });
 
 document.getElementById('btnRandInfo').addEventListener('click', () => {
