@@ -1,9 +1,12 @@
 'use strict';
 
 // ── Method configuration ───────────────────────────────────────────────────────
-const METHOD_KEYS   = ['uniform', 'stratified', 'halton', 'pointfilter'];
-const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b794f4', pointfilter: '#f6ad55' };
-const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton', pointfilter: 'Point-filter' };
+const METHOD_KEYS   = ['uniform', 'stratified', 'halton', 'pointfilter', 'foldingfan'];
+const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b794f4', pointfilter: '#f6ad55', foldingfan: '#fc8181' };
+const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton', pointfilter: 'Point-filter', foldingfan: 'Folding Fan' };
+
+// Number of equally-spaced ribs in the folding fan (0 … π/2)
+const FAN_RIBS = 16;
 
 // ── Canvas setup ──────────────────────────────────────────────────────────────
 const chartCanvas = document.getElementById('chartCanvas');
@@ -36,6 +39,7 @@ function createMethodState() {
     autocorrHistory: [],
     lastSample: 0,
     haltonIndex: 0,
+    fanIndex: 0,
     stripCounts: new Array(numStrips).fill(0),
     gridCounts:  new Array(GRID_N * GRID_N).fill(0),
     angleCounts: new Array(ANGLE_BINS).fill(0),
@@ -175,6 +179,17 @@ function dropNeedle(method) {
       cy    = halton(state.haltonIndex, 3) * height;
       theta = halton(state.haltonIndex, 5) * Math.PI;
       state.haltonIndex++;
+    } else if (method === 'foldingfan') {
+      // Folding-fan: N ribs equally spaced over [0, π/2] (a quarter circle).
+      // Position is uniformly random; only the angle is deterministic.
+      // Note: computing these rib angles requires knowing π — the very quantity
+      // we are estimating.  The method still converges correctly because
+      // |sin θ| = |sin(π − θ)|, so restricting θ to [0, π/2] gives the same
+      // crossing statistics as the full semicircle.
+      cx    = Math.random() * width;
+      cy    = Math.random() * height;
+      theta = (state.fanIndex % FAN_RIBS) * (Math.PI / 2) / (FAN_RIBS - 1);
+      state.fanIndex++;
     } else {
       cx    = Math.random() * width;
       cy    = Math.random() * height;
