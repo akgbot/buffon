@@ -295,7 +295,7 @@ function updateRandMetrics() {
   }
   html += '</tr></thead><tbody>';
 
-  html += '<tr><td class="rand-label">Spatial χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
+  html += '<tr><td class="rand-label">Spatial χ²/df</td>';
   for (const key of enabledKeys) {
     const r = chiSqRatio(methodStates[key].gridCounts);
     html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
@@ -303,7 +303,7 @@ function updateRandMetrics() {
   html += '</tr>';
   html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="spatialChiCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
-  html += '<tr><td class="rand-label">Angle χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
+  html += '<tr><td class="rand-label">Angle χ²/df</td>';
   for (const key of enabledKeys) {
     const r = chiSqRatio(methodStates[key].angleCounts);
     html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
@@ -311,7 +311,7 @@ function updateRandMetrics() {
   html += '</tr>';
   html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="angleChiCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
-  html += '<tr><td class="rand-label">Serial autocorr<span class="mnote">ideal ≈ 0</span></td>';
+  html += '<tr><td class="rand-label">Serial autocorr</td>';
   for (const key of enabledKeys) {
     const r = lag1Autocorr(methodStates[key].crossingSeq);
     const s = r !== null ? (r >= 0 ? '+' : '') + r.toFixed(4) : '—';
@@ -416,10 +416,6 @@ function drawStatChart(canvas, ctx, getHistory, yMin, yMax, refVal, refLabel) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.fillStyle = 'rgba(108,99,255,0.7)';
-  ctx.font      = '10px monospace';
-  ctx.fillText(refLabel, 4, refY - 3);
-
   // One line per method
   for (const key of METHOD_KEYS) {
     if (!enabledMethods.has(key)) continue;
@@ -436,6 +432,48 @@ function drawStatChart(canvas, ctx, getHistory, yMin, yMax, refVal, refLabel) {
     });
     ctx.stroke();
   }
+
+  // Legend (drawn last so it appears on top)
+  const legendText = 'ideal = ' + refLabel;
+  ctx.font = '9px monospace';
+  const lineLen = 14;
+  const gap     = 4;
+  const textW   = ctx.measureText(legendText).width;
+  const padX    = 5;
+  const boxW    = padX + lineLen + gap + textW + padX;
+  const boxH    = 14;
+  const bx      = width - boxW - 4;
+  const by      = 4;
+
+  // Background box
+  ctx.fillStyle = 'rgba(26,29,39,0.88)';
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(bx, by, boxW, boxH, 3);
+  } else {
+    ctx.rect(bx, by, boxW, boxH);
+  }
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = 'rgba(108,99,255,0.35)';
+  ctx.lineWidth   = 0.5;
+  ctx.setLineDash([]);
+  ctx.stroke();
+
+  // Dashed line swatch
+  ctx.strokeStyle = 'rgba(108,99,255,0.8)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(bx + padX, by + boxH / 2);
+  ctx.lineTo(bx + padX + lineLen, by + boxH / 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Legend text
+  ctx.fillStyle = 'rgba(108,99,255,0.9)';
+  ctx.fillText(legendText, bx + padX + lineLen + gap, by + boxH / 2 + 3);
 }
 
 function sizeAndDrawStatCharts() {
