@@ -13,6 +13,7 @@
   </header>
 
   <main>
+    <div class="canvas-column">
     <section class="canvas-section">
       <div class="sim-panels">
         <div class="sim-panel" id="panel-uniform">
@@ -33,6 +34,12 @@
         </div>
       </div>
     </section>
+
+      <section class="chart-section">
+        <h2>π Convergence <button id="btnZoom" class="btn btn-zoom">±1.5</button></h2>
+        <canvas id="chartCanvas"></canvas>
+      </section>
+    </div>
 
     <aside class="panel">
       <section class="controls">
@@ -155,11 +162,6 @@
           <p>Lag-1 Pearson correlation of the last 500 crossing results. The significance threshold for zero correlation is roughly 1/√500 ≈ 0.045. Thresholds: green |r|&lt;0.05, yellow 0.05–0.12, red &gt;0.12.</p>
         </div>
         <div id="randMetrics"></div>
-      </section>
-
-      <section class="chart-section">
-        <h2>π Convergence <button id="btnZoom" class="btn btn-zoom">±1.5</button></h2>
-        <canvas id="chartCanvas"></canvas>
       </section>
 
       <section class="formula">
