@@ -547,6 +547,14 @@ document.getElementById('btnZoom').addEventListener('click', () => {
 sliderLen.addEventListener('input', () => {
   needleRatio = parseFloat(sliderLen.value);
   labelLen.textContent = needleRatio.toFixed(2) + '× spacing';
+  running = false;
+  cancelAnimationFrame(animId);
+  resetAllStates();
+  btnStart.disabled    = false;
+  btnStart.textContent = 'Start';
+  btnPause.disabled    = true;
+  updateStats();
+  drawChart();
 });
 
 sliderStrips.addEventListener('input', () => {
