@@ -295,7 +295,7 @@ function updateRandMetrics() {
   }
   html += '</tr></thead><tbody>';
 
-  html += '<tr><td class="rand-label">Spatial χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
+  html += '<tr><td class="rand-label">Spatial χ²/df</td>';
   for (const key of enabledKeys) {
     const r = chiSqRatio(methodStates[key].gridCounts);
     html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
@@ -303,7 +303,7 @@ function updateRandMetrics() {
   html += '</tr>';
   html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="spatialChiCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
-  html += '<tr><td class="rand-label">Angle χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
+  html += '<tr><td class="rand-label">Angle χ²/df</td>';
   for (const key of enabledKeys) {
     const r = chiSqRatio(methodStates[key].angleCounts);
     html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
@@ -311,7 +311,7 @@ function updateRandMetrics() {
   html += '</tr>';
   html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="angleChiCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
-  html += '<tr><td class="rand-label">Serial autocorr<span class="mnote">ideal ≈ 0</span></td>';
+  html += '<tr><td class="rand-label">Serial autocorr</td>';
   for (const key of enabledKeys) {
     const r = lag1Autocorr(methodStates[key].crossingSeq);
     const s = r !== null ? (r >= 0 ? '+' : '') + r.toFixed(4) : '—';
