@@ -189,6 +189,19 @@ label {
   font-weight: 600;
 }
 
+.runtime-badge {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+  float: right;
+}
+
+.runtime-badge #runtimeDisplay {
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 input[type="range"] {
   -webkit-appearance: none;
   width: 100%;
