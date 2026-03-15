@@ -48,7 +48,7 @@ let running       = false;
 let animId        = null;
 let needleRatio   = 0.8;
 let dropsPerFrame = 5;
-const enabledMethods = new Set(['uniform']);
+const enabledMethods = new Set(['uniform', 'pointfilter']);
 
 function halton(index, base) {
   let result = 0, f = 1;
