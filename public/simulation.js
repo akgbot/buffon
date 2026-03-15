@@ -6,14 +6,8 @@ const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b79
 const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton', pointfilter: 'Point-filter' };
 
 // ── Canvas setup ──────────────────────────────────────────────────────────────
-const chartCanvas       = document.getElementById('chartCanvas');
-const chartCtx          = chartCanvas.getContext('2d');
-const spatialChiCanvas  = document.getElementById('spatialChiCanvas');
-const spatialChiCtx     = spatialChiCanvas.getContext('2d');
-const angleChiCanvas    = document.getElementById('angleChiCanvas');
-const angleChiCtx       = angleChiCanvas.getContext('2d');
-const autocorrCanvas    = document.getElementById('autocorrCanvas');
-const autocorrCtx       = autocorrCanvas.getContext('2d');
+const chartCanvas = document.getElementById('chartCanvas');
+const chartCtx    = chartCanvas.getContext('2d');
 
 const canvases = {};
 const contexts = {};
@@ -91,17 +85,12 @@ function resizeCanvases() {
   chartCanvas.width  = chartSection.clientWidth - 40;
   chartCanvas.height = 100;
 
-  for (const statCanvas of [spatialChiCanvas, angleChiCanvas, autocorrCanvas]) {
-    statCanvas.width  = statCanvas.parentElement.clientWidth - 40;
-    statCanvas.height = 100;
-  }
-
   for (const key of METHOD_KEYS) {
     drawFloor(key);
     redrawNeedles(key);
   }
   drawChart();
-  drawStatCharts();
+  sizeAndDrawStatCharts();
 }
 
 // ── Floor and needle drawing ──────────────────────────────────────────────────
@@ -298,40 +287,42 @@ function updateStatsVisibility() {
 }
 
 function updateRandMetrics() {
+  const enabledKeys = METHOD_KEYS.filter(k => enabledMethods.has(k));
+  const numCols = enabledKeys.length + 1;
   let html = '<table class="rand-table"><thead><tr><th></th>';
-  for (const key of METHOD_KEYS) {
-    if (!enabledMethods.has(key)) continue;
+  for (const key of enabledKeys) {
     html += `<th style="color:${METHOD_COLORS[key]}">${METHOD_LABELS[key]}</th>`;
   }
   html += '</tr></thead><tbody>';
 
   html += '<tr><td class="rand-label">Spatial χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
-  for (const key of METHOD_KEYS) {
-    if (!enabledMethods.has(key)) continue;
+  for (const key of enabledKeys) {
     const r = chiSqRatio(methodStates[key].gridCounts);
     html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
   }
   html += '</tr>';
+  html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="spatialChiCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
   html += '<tr><td class="rand-label">Angle χ²/df<span class="mnote">ideal ≈ 1.0</span></td>';
-  for (const key of METHOD_KEYS) {
-    if (!enabledMethods.has(key)) continue;
+  for (const key of enabledKeys) {
     const r = chiSqRatio(methodStates[key].angleCounts);
     html += `<td class="mval ${chiColor(r)}">${r !== null ? r.toFixed(3) : '—'}</td>`;
   }
   html += '</tr>';
+  html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="angleChiCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
   html += '<tr><td class="rand-label">Serial autocorr<span class="mnote">ideal ≈ 0</span></td>';
-  for (const key of METHOD_KEYS) {
-    if (!enabledMethods.has(key)) continue;
+  for (const key of enabledKeys) {
     const r = lag1Autocorr(methodStates[key].crossingSeq);
     const s = r !== null ? (r >= 0 ? '+' : '') + r.toFixed(4) : '—';
     html += `<td class="mval ${autocorrColor(r)}">${s}</td>`;
   }
   html += '</tr>';
+  html += `<tr class="rand-chart-row"><td colspan="${numCols}"><canvas id="autocorrCanvas" class="stat-inline-chart"></canvas></td></tr>`;
 
   html += '</tbody></table>';
   elRandMetrics.innerHTML = html;
+  sizeAndDrawStatCharts();
 }
 
 // ── Chart zoom ────────────────────────────────────────────────────────────────
@@ -447,13 +438,28 @@ function drawStatChart(canvas, ctx, getHistory, yMin, yMax, refVal, refLabel) {
   }
 }
 
+function sizeAndDrawStatCharts() {
+  for (const id of ['spatialChiCanvas', 'angleChiCanvas', 'autocorrCanvas']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const w = el.offsetWidth;
+    if (w > 0) el.width = w;
+    el.height = 70;
+  }
+  drawStatCharts();
+}
+
 function drawStatCharts() {
-  drawStatChart(spatialChiCanvas, spatialChiCtx,
-    key => methodStates[key].spatialChiHistory, 0, 3, 1, '1');
-  drawStatChart(angleChiCanvas, angleChiCtx,
-    key => methodStates[key].angleChiHistory, 0, 3, 1, '1');
-  drawStatChart(autocorrCanvas, autocorrCtx,
-    key => methodStates[key].autocorrHistory, -0.3, 0.3, 0, '0');
+  const specs = [
+    { id: 'spatialChiCanvas', getHist: key => methodStates[key].spatialChiHistory, yMin: 0,    yMax: 3,   refVal: 1, refLabel: '1' },
+    { id: 'angleChiCanvas',   getHist: key => methodStates[key].angleChiHistory,   yMin: 0,    yMax: 3,   refVal: 1, refLabel: '1' },
+    { id: 'autocorrCanvas',   getHist: key => methodStates[key].autocorrHistory,   yMin: -0.3, yMax: 0.3, refVal: 0, refLabel: '0' },
+  ];
+  for (const { id, getHist, yMin, yMax, refVal, refLabel } of specs) {
+    const canvas = document.getElementById(id);
+    if (!canvas || !canvas.width) continue;
+    drawStatChart(canvas, canvas.getContext('2d'), getHist, yMin, yMax, refVal, refLabel);
+  }
 }
 
 // ── Animation loop ────────────────────────────────────────────────────────────
@@ -471,7 +477,6 @@ function step() {
   }
 
   drawChart();
-  drawStatCharts();
   updateStats();
   animId = requestAnimationFrame(step);
 }
@@ -518,7 +523,6 @@ sliderStrips.addEventListener('input', () => {
   btnPause.disabled    = true;
   updateStats();
   drawChart();
-  drawStatCharts();
 });
 
 sliderSpd.addEventListener('input', () => {
@@ -551,7 +555,6 @@ btnReset.addEventListener('click', () => {
   btnPause.disabled    = true;
   updateStats();
   drawChart();
-  drawStatCharts();
 });
 
 document.getElementById('btnRandInfo').addEventListener('click', () => {

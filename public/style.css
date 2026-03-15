@@ -349,10 +349,7 @@ input[type="range"]::-webkit-slider-thumb {
   margin-bottom: 14px;
 }
 
-#chartCanvas,
-#spatialChiCanvas,
-#angleChiCanvas,
-#autocorrCanvas {
+#chartCanvas {
   width: 100%;
   height: 100px;
   border-radius: 6px;
@@ -361,13 +358,15 @@ input[type="range"]::-webkit-slider-thumb {
   display: block;
 }
 
-.chart-section h2 .mnote {
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 400;
-  font-size: 0.7rem;
-  margin-left: 6px;
+.stat-inline-chart {
+  width: 100%;
+  height: 70px;
+  border-radius: 4px;
+  background: var(--bg);
+  display: block;
 }
+
+.rand-chart-row td { padding: 4px 0 10px; }
 
 /* Formula */
 .formula p {
