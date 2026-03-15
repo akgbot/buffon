@@ -31,6 +31,9 @@ function createMethodState() {
     crossings: 0,
     needles: [],
     piHistory: [],
+    spatialChiHistory: [],
+    angleChiHistory: [],
+    autocorrHistory: [],
     lastSample: 0,
     haltonIndex: 0,
     stripCounts: new Array(numStrips).fill(0),
@@ -48,7 +51,7 @@ let running       = false;
 let animId        = null;
 let needleRatio   = 0.8;
 let dropsPerFrame = 5;
-const enabledMethods = new Set(['uniform']);
+const enabledMethods = new Set(['uniform', 'pointfilter']);
 
 function halton(index, base) {
   let result = 0, f = 1;
@@ -87,6 +90,7 @@ function resizeCanvases() {
     redrawNeedles(key);
   }
   drawChart();
+  sizeAndDrawStatCharts();
 }
 
 // ── Floor and needle drawing ──────────────────────────────────────────────────
@@ -291,6 +295,9 @@ function makeCell(tag, text, cssClass, style) {
 }
 
 function updateRandMetrics() {
+  const enabledKeys = METHOD_KEYS.filter(k => enabledMethods.has(k));
+  const numCols = enabledKeys.length + 1;
+
   const table = document.createElement('table');
   table.className = 'rand-table';
 
@@ -298,42 +305,45 @@ function updateRandMetrics() {
   const thead = table.createTHead();
   const hrow  = thead.insertRow();
   hrow.appendChild(makeCell('th', ''));
-  for (const key of METHOD_KEYS) {
-    if (!enabledMethods.has(key)) continue;
+  for (const key of enabledKeys) {
     hrow.appendChild(makeCell('th', METHOD_LABELS[key], '', `color:${METHOD_COLORS[key]}`));
   }
 
   const tbody = table.createTBody();
 
-  // Row builder
-  function addRow(label, note, valueFn, colorFn) {
+  // Adds a value row + a chart row beneath it
+  function addMetricRows(label, canvasId, valueFn, colorFn) {
     const row = tbody.insertRow();
-    const lbl = makeCell('td', label, 'rand-label');
-    const mnote = document.createElement('span');
-    mnote.className = 'mnote';
-    mnote.textContent = note;
-    lbl.appendChild(mnote);
-    row.appendChild(lbl);
-    for (const key of METHOD_KEYS) {
-      if (!enabledMethods.has(key)) continue;
+    row.appendChild(makeCell('td', label, 'rand-label'));
+    for (const key of enabledKeys) {
       const r = valueFn(key);
       row.appendChild(makeCell('td', r !== null ? r.display : '—', `mval ${colorFn(r !== null ? r.value : null)}`));
     }
+    const chartRow  = tbody.insertRow();
+    chartRow.className = 'rand-chart-row';
+    const chartCell = document.createElement('td');
+    chartCell.colSpan = numCols;
+    const canvas = document.createElement('canvas');
+    canvas.id        = canvasId;
+    canvas.className = 'stat-inline-chart';
+    chartCell.appendChild(canvas);
+    chartRow.appendChild(chartCell);
   }
 
-  addRow('Spatial χ²/df', 'ideal ≈ 1.0',
-    key => { const v = chiSqRatio(methodStates[key].gridCounts);   return v !== null ? { value: v, display: v.toFixed(3) } : null; },
+  addMetricRows('Spatial χ²/df', 'spatialChiCanvas',
+    key => { const v = chiSqRatio(methodStates[key].gridCounts);    return v !== null ? { value: v, display: v.toFixed(3) } : null; },
     chiColor);
 
-  addRow('Angle χ²/df', 'ideal ≈ 1.0',
-    key => { const v = chiSqRatio(methodStates[key].angleCounts);  return v !== null ? { value: v, display: v.toFixed(3) } : null; },
+  addMetricRows('Angle χ²/df', 'angleChiCanvas',
+    key => { const v = chiSqRatio(methodStates[key].angleCounts);   return v !== null ? { value: v, display: v.toFixed(3) } : null; },
     chiColor);
 
-  addRow('Serial autocorr', 'ideal ≈ 0',
+  addMetricRows('Serial autocorr', 'autocorrCanvas',
     key => { const v = lag1Autocorr(methodStates[key].crossingSeq); return v !== null ? { value: v, display: (v >= 0 ? '+' : '') + v.toFixed(4) } : null; },
-    r => autocorrColor(r));
+    autocorrColor);
 
   elRandMetrics.replaceChildren(table);
+  sizeAndDrawStatCharts();
 }
 
 // ── Chart zoom ────────────────────────────────────────────────────────────────
@@ -347,6 +357,24 @@ function sampleChart(key) {
   if (est !== null) {
     state.piHistory.push(est);
     if (state.piHistory.length > CHART_POINTS) state.piHistory.shift();
+  }
+
+  const sc = chiSqRatio(state.gridCounts);
+  if (sc !== null) {
+    state.spatialChiHistory.push(sc);
+    if (state.spatialChiHistory.length > CHART_POINTS) state.spatialChiHistory.shift();
+  }
+
+  const ac = chiSqRatio(state.angleCounts);
+  if (ac !== null) {
+    state.angleChiHistory.push(ac);
+    if (state.angleChiHistory.length > CHART_POINTS) state.angleChiHistory.shift();
+  }
+
+  const corr = lag1Autocorr(state.crossingSeq);
+  if (corr !== null) {
+    state.autocorrHistory.push(corr);
+    if (state.autocorrHistory.length > CHART_POINTS) state.autocorrHistory.shift();
   }
 }
 
@@ -389,6 +417,108 @@ function drawChart() {
   chartCtx.fillStyle = 'rgba(108,99,255,0.7)';
   chartCtx.font      = '10px monospace';
   chartCtx.fillText('π', 4, pyRef - 3);
+}
+
+// ── Randomness stat charts ─────────────────────────────────────────────────────
+function drawStatChart(canvas, ctx, getHistory, yMin, yMax, refVal, refLabel) {
+  const { width, height } = canvas;
+  ctx.clearRect(0, 0, width, height);
+
+  const toY = v => height - ((v - yMin) / (yMax - yMin)) * height;
+  const refY = Math.max(0, Math.min(height, toY(refVal)));
+
+  // Reference line
+  ctx.strokeStyle = 'rgba(108,99,255,0.4)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(0, refY);
+  ctx.lineTo(width, refY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // One line per method
+  for (const key of METHOD_KEYS) {
+    if (!enabledMethods.has(key)) continue;
+    const hist = getHistory(key);
+    if (hist.length < 2) continue;
+    ctx.strokeStyle = METHOD_COLORS[key];
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    const step = width / (CHART_POINTS - 1);
+    hist.forEach((v, i) => {
+      const x = i * step;
+      const y = toY(Math.max(yMin, Math.min(yMax, v)));
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  // Legend (drawn last so it appears on top)
+  const legendText = 'ideal = ' + refLabel;
+  ctx.font = '9px monospace';
+  const lineLen = 14;
+  const gap     = 4;
+  const textW   = ctx.measureText(legendText).width;
+  const padX    = 5;
+  const boxW    = padX + lineLen + gap + textW + padX;
+  const boxH    = 14;
+  const bx      = width - boxW - 4;
+  const by      = 4;
+
+  // Background box
+  ctx.fillStyle = 'rgba(26,29,39,0.88)';
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(bx, by, boxW, boxH, 3);
+  } else {
+    ctx.rect(bx, by, boxW, boxH);
+  }
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = 'rgba(108,99,255,0.35)';
+  ctx.lineWidth   = 0.5;
+  ctx.setLineDash([]);
+  ctx.stroke();
+
+  // Dashed line swatch
+  ctx.strokeStyle = 'rgba(108,99,255,0.8)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(bx + padX, by + boxH / 2);
+  ctx.lineTo(bx + padX + lineLen, by + boxH / 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Legend text
+  ctx.fillStyle = 'rgba(108,99,255,0.9)';
+  ctx.fillText(legendText, bx + padX + lineLen + gap, by + boxH / 2 + 3);
+}
+
+function sizeAndDrawStatCharts() {
+  for (const id of ['spatialChiCanvas', 'angleChiCanvas', 'autocorrCanvas']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const w = el.offsetWidth;
+    if (w > 0) el.width = w;
+    el.height = 70;
+  }
+  drawStatCharts();
+}
+
+function drawStatCharts() {
+  const specs = [
+    { id: 'spatialChiCanvas', getHist: key => methodStates[key].spatialChiHistory, yMin: 0,    yMax: 3,   refVal: 1, refLabel: '1' },
+    { id: 'angleChiCanvas',   getHist: key => methodStates[key].angleChiHistory,   yMin: 0,    yMax: 3,   refVal: 1, refLabel: '1' },
+    { id: 'autocorrCanvas',   getHist: key => methodStates[key].autocorrHistory,   yMin: -0.3, yMax: 0.3, refVal: 0, refLabel: '0' },
+  ];
+  for (const { id, getHist, yMin, yMax, refVal, refLabel } of specs) {
+    const canvas = document.getElementById(id);
+    if (!canvas || !canvas.width) continue;
+    drawStatChart(canvas, canvas.getContext('2d'), getHist, yMin, yMax, refVal, refLabel);
+  }
 }
 
 // ── Animation loop ────────────────────────────────────────────────────────────
