@@ -32,6 +32,10 @@
           <div class="sim-label" style="color:#f6ad55">Point-filter</div>
           <canvas id="canvas-pointfilter"></canvas>
         </div>
+        <div class="sim-panel" id="panel-foldingfan" hidden>
+          <div class="sim-label" style="color:#fc8181">Folding Fan</div>
+          <canvas id="canvas-foldingfan"></canvas>
+        </div>
       </div>
     </section>
 
@@ -77,6 +81,14 @@
             </label>
           </div>
           <div class="method-info">Picks a random starting point, then generates candidate second points via rejection sampling inside a disk of radius L. No angle is ever computed — direction is implicit in the two endpoints.</div>
+
+          <div class="method-toggle-row">
+            <label class="method-toggle">
+              <input type="checkbox" id="toggle-foldingfan">
+              <span style="color:#fc8181">Folding Fan</span>
+            </label>
+          </div>
+          <div class="method-info">Imagines a fan with N ribs opening to 90°. Each drop picks one rib at random, giving N equally-spaced angles over a quarter-circle. Because sin(θ) = sin(π−θ), this covers the full crossing-probability range with no π constant — rib directions are computed from Math.atan2(1,0) = π/2 using pure geometry.</div>
         </div>
 
         <label>
@@ -89,6 +101,12 @@
           Strips
           <span class="value-badge" id="stripsLabel">6</span>
           <input type="range" id="strips" min="2" max="15" step="1" value="6">
+        </label>
+
+        <label>
+          Fan ribs (N)
+          <span class="value-badge" id="fanRibsLabel">16 ribs</span>
+          <input type="range" id="fanRibs" min="2" max="64" step="1" value="16">
         </label>
 
         <label>
@@ -114,6 +132,7 @@
               <th data-method="stratified" style="color:#48bb78">Stratified</th>
               <th data-method="halton" style="color:#b794f4">Halton</th>
               <th data-method="pointfilter" style="color:#f6ad55">Point-filter</th>
+              <th data-method="foldingfan" style="color:#fc8181">Folding Fan</th>
             </tr>
           </thead>
           <tbody>
@@ -123,6 +142,7 @@
               <td data-method="stratified" id="stat-drops-stratified">0</td>
               <td data-method="halton" id="stat-drops-halton">0</td>
               <td data-method="pointfilter" id="stat-drops-pointfilter">0</td>
+              <td data-method="foldingfan" id="stat-drops-foldingfan">0</td>
             </tr>
             <tr>
               <td class="stat-label">π est.</td>
@@ -130,6 +150,7 @@
               <td data-method="stratified" id="stat-pi-stratified" class="stat-pi">—</td>
               <td data-method="halton" id="stat-pi-halton" class="stat-pi">—</td>
               <td data-method="pointfilter" id="stat-pi-pointfilter" class="stat-pi">—</td>
+              <td data-method="foldingfan" id="stat-pi-foldingfan" class="stat-pi">—</td>
             </tr>
             <tr>
               <td class="stat-label">Error</td>
@@ -137,6 +158,7 @@
               <td data-method="stratified" id="stat-error-stratified" class="stat-error">—</td>
               <td data-method="halton" id="stat-error-halton" class="stat-error">—</td>
               <td data-method="pointfilter" id="stat-error-pointfilter" class="stat-error">—</td>
+              <td data-method="foldingfan" id="stat-error-foldingfan" class="stat-error">—</td>
             </tr>
           </tbody>
         </table>

@@ -1,9 +1,9 @@
 'use strict';
 
 // ── Method configuration ───────────────────────────────────────────────────────
-const METHOD_KEYS   = ['uniform', 'stratified', 'halton', 'pointfilter'];
-const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b794f4', pointfilter: '#f6ad55' };
-const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton', pointfilter: 'Point-filter' };
+const METHOD_KEYS   = ['uniform', 'stratified', 'halton', 'pointfilter', 'foldingfan'];
+const METHOD_COLORS = { uniform: '#63b3ed', stratified: '#48bb78', halton: '#b794f4', pointfilter: '#f6ad55', foldingfan: '#fc8181' };
+const METHOD_LABELS = { uniform: 'Uniform', stratified: 'Stratified', halton: 'Halton', pointfilter: 'Point-filter', foldingfan: 'Folding Fan' };
 
 // ── Canvas setup ──────────────────────────────────────────────────────────────
 const chartCanvas = document.getElementById('chartCanvas');
@@ -58,6 +58,23 @@ function halton(index, base) {
   while (index > 0) { f /= base; result += f * (index % base); index = Math.floor(index / base); }
   return result;
 }
+
+// ── Folding-fan ribs ──────────────────────────────────────────────────────────
+// N equally-spaced directions spanning 0° → 90°, computed without Math.PI.
+// The quarter-turn angle is derived geometrically: Math.atan2(1, 0) = π/2.
+let fanRibCount = 16;
+
+function buildFanRibs(N) {
+  const quarterTurn = Math.atan2(1, 0); // π/2 via geometry, no Math.PI needed
+  const ribs = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const a = N > 1 ? (i * quarterTurn) / (N - 1) : 0;
+    ribs[i] = { dx: Math.cos(a), dy: Math.sin(a) };
+  }
+  return ribs;
+}
+
+let fanRibs = buildFanRibs(fanRibCount);
 
 const SPEED_MAP = {
   1: { dpf: 1,   label: 'Slow'    },
@@ -175,6 +192,14 @@ function dropNeedle(method) {
       cy    = halton(state.haltonIndex, 3) * height;
       theta = halton(state.haltonIndex, 5) * Math.PI;
       state.haltonIndex++;
+    } else if (method === 'foldingfan') {
+      cx = Math.random() * width;
+      cy = Math.random() * height;
+      // Pick one of the N pre-computed rib directions uniformly at random.
+      // All rib angles live in [0°, 90°]; sin(θ) symmetry means this is
+      // statistically identical to sampling from [0°, 180°] for crossing.
+      const ribIdx = Math.floor(Math.random() * fanRibs.length);
+      theta = Math.atan2(fanRibs[ribIdx].dy, fanRibs[ribIdx].dx);
     } else {
       cx    = Math.random() * width;
       cy    = Math.random() * height;
@@ -534,9 +559,11 @@ const btnReset     = document.getElementById('btnReset');
 const sliderLen    = document.getElementById('needleLen');
 const sliderSpd    = document.getElementById('speed');
 const sliderStrips = document.getElementById('strips');
+const sliderFanRibs = document.getElementById('fanRibs');
 const labelLen     = document.getElementById('needleLenLabel');
 const labelSpd     = document.getElementById('speedLabel');
 const labelStrips  = document.getElementById('stripsLabel');
+const labelFanRibs = document.getElementById('fanRibsLabel');
 
 document.getElementById('btnZoom').addEventListener('click', () => {
   zoomIndex = (zoomIndex + 1) % ZOOM_LEVELS.length;
@@ -567,6 +594,15 @@ sliderSpd.addEventListener('input', () => {
   const s = parseInt(sliderSpd.value);
   dropsPerFrame        = SPEED_MAP[s].dpf;
   labelSpd.textContent = SPEED_MAP[s].label;
+});
+
+sliderFanRibs.addEventListener('input', () => {
+  fanRibCount          = parseInt(sliderFanRibs.value);
+  fanRibs              = buildFanRibs(fanRibCount);
+  labelFanRibs.textContent = fanRibCount + ' ribs';
+  // Reset fan state so old angles don't skew stats
+  methodStates.foldingfan = createMethodState();
+  drawFloor('foldingfan');
 });
 
 btnStart.addEventListener('click', () => {
@@ -627,6 +663,10 @@ dropsPerFrame        = SPEED_MAP[initSpeed].dpf;
 labelSpd.textContent = SPEED_MAP[initSpeed].label;
 numStrips = parseInt(sliderStrips.value);
 labelStrips.textContent = numStrips;
+
+fanRibCount = parseInt(sliderFanRibs.value);
+fanRibs = buildFanRibs(fanRibCount);
+labelFanRibs.textContent = fanRibCount + ' ribs';
 
 updateStatsVisibility();
 updateStats();
